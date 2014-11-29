@@ -45,6 +45,11 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
+    public LogEntry getLogEntry(long logIndex) {
+        return logEntries.get((int) logIndex);
+    }
+
+    @Override
     public void appendLogEntry(LogEntry newEntry) {
         logEntries.add(newEntry);
     }
