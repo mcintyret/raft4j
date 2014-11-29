@@ -85,12 +85,17 @@ public class Server implements RpcMessageVisitor {
         messageQueue.add(message);
     }
 
-    public void run() throws InterruptedException {
+    public void run() {
         while (true) {
             long timeout = (currentRole == ServerRole.LEADER ? nextHeartbeat :
                 nextElectionTimeout) - System.currentTimeMillis();
 
-            RpcMessage message = messageQueue.poll(timeout, TimeUnit.MILLISECONDS);
+            RpcMessage message;
+            try {
+                message = messageQueue.poll(timeout, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                throw new AssertionError(e);
+            }
 
             if (message != null) {
                 // If I'm not already a follower, and someone else's term > mine, then I should become a follower
