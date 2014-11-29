@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class RequestVoteRequest {
+public class RequestVoteRequest implements RpcMessage {
 
     private final long term;
 
@@ -35,5 +35,10 @@ public class RequestVoteRequest {
 
     public long getLastLogTerm() {
         return lastLogTerm;
+    }
+
+    @Override
+    public void visit(RpcMessageVisitor visitor) {
+        visitor.onRequestVoteRequest(this);
     }
 }

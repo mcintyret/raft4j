@@ -6,7 +6,7 @@ import com.mcintyret.raft.core.LogEntry;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesRequest {
+public class AppendEntriesRequest implements RpcMessage {
 
     private final long term;
 
@@ -51,5 +51,10 @@ public class AppendEntriesRequest {
 
     public long getLeaderCommit() {
         return leaderCommit;
+    }
+
+    @Override
+    public void visit(RpcMessageVisitor visitor) {
+        visitor.onAppendEntriesRequest(this);
     }
 }

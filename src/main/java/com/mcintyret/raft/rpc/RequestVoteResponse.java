@@ -4,13 +4,13 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class RequestVotesResponse {
+public class RequestVoteResponse implements RpcMessage {
 
     private final long term;
 
     private final boolean voteGranted;
 
-    public RequestVotesResponse(long term, boolean voteGranted) {
+    public RequestVoteResponse(long term, boolean voteGranted) {
         this.term = term;
         this.voteGranted = voteGranted;
     }
@@ -21,5 +21,10 @@ public class RequestVotesResponse {
 
     public boolean isVoteGranted() {
         return voteGranted;
+    }
+
+    @Override
+    public void visit(RpcMessageVisitor visitor) {
+        visitor.onRequestVoteResponse(this);
     }
 }

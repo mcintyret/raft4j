@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesResponse {
+public class AppendEntriesResponse implements RpcMessage {
 
     private final long term;
 
@@ -21,5 +21,10 @@ public class AppendEntriesResponse {
 
     public boolean isSuccess() {
         return success;
+    }
+
+    @Override
+    public void visit(RpcMessageVisitor visitor) {
+        visitor.onAppendEntriesResponse(this);
     }
 }
