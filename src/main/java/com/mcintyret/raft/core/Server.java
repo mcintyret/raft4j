@@ -1,5 +1,6 @@
 package com.mcintyret.raft.core;
 
+import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
@@ -28,7 +29,9 @@ public class Server implements RpcMessageVisitor {
     private final List<Integer> peers;
 
     // TODO: inject
-    private final PersistentState persistentState = new InMemoryPersistentState();
+    private final PersistentState persistentState;
+
+    private final ElectionTimeoutGenerator electionTimeoutGenerator;
 
     // All messages are processed in a single thread, simplifying the logic
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
@@ -40,9 +43,13 @@ public class Server implements RpcMessageVisitor {
 
     private long lastApplied;
 
-    public Server(int myId, List<Integer> peers) {
+    private long electionTimeout;
+
+    public Server(int myId, List<Integer> peers, PersistentState persistentState, ElectionTimeoutGenerator electionTimeoutGenerator) {
         this.myId = myId;
         this.peers = peers;
+        this.persistentState = persistentState;
+        this.electionTimeoutGenerator = electionTimeoutGenerator;
     }
 
     public void messageReceived(RpcMessage message) {
