@@ -1,5 +1,7 @@
 package com.mcintyret.raft.core;
 
+import com.mcintyret.raft.persist.InMemoryPersistentState;
+import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
 import com.mcintyret.raft.rpc.NewEntryRequest;
@@ -24,6 +26,9 @@ public class Server implements RpcMessageVisitor {
     // turn up.
     // TODO: remove this assumption!
     private final List<Integer> peers;
+
+    // TODO: inject
+    private final PersistentState persistentState = new InMemoryPersistentState();
 
     // All messages are processed in a single thread, simplifying the logic
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
