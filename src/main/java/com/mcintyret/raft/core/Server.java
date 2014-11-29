@@ -2,7 +2,6 @@ package com.mcintyret.raft.core;
 
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
-import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
@@ -12,15 +11,20 @@ import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * User: tommcintyre
  * Date: 11/29/14
  */
 public class Server implements RpcMessageVisitor {
+
+    // TODO: configurable?
+    private static final long HEARTBEAT_TIMEOUT = 200;
 
     private final int myId;
 
@@ -41,11 +45,15 @@ public class Server implements RpcMessageVisitor {
     // TODO: behaviour by polymorphism, rather than switching on this
     private ServerRole currentRole = ServerRole.CANDIDATE; // At startup, every server is a candidate
 
+    private int currentLeaderId;
+
     private long commitIndex;
 
     private long lastApplied;
 
-    private long electionTimeout;
+    private long nextElectionTimeout;
+
+    private long nextHeartbeat;
 
     // candidate only
     private int votes;
@@ -64,16 +72,21 @@ public class Server implements RpcMessageVisitor {
         this.persistentState = persistentState;
         this.electionTimeoutGenerator = electionTimeoutGenerator;
         this.messageDispatcher = messageDispatcher;
+
+        this.nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+        this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
     }
 
     public void messageReceived(RpcMessage message) {
         messageQueue.add(message);
     }
 
-    public void run() {
+    public void run() throws InterruptedException {
         while (true) {
-            // TODO: use timeout version?
-            RpcMessage message = messageQueue.poll();
+            long timeout = (currentRole == ServerRole.LEADER ? nextHeartbeat :
+                nextElectionTimeout) - System.currentTimeMillis();
+
+            RpcMessage message = messageQueue.poll(timeout, TimeUnit.MILLISECONDS);
 
             if (message != null) {
                 // If I'm not already a follower, and someone else's term > mine, then I should become a follower
@@ -83,13 +96,41 @@ public class Server implements RpcMessageVisitor {
                     currentRole = ServerRole.FOLLOWER;
                 }
                 message.visit(this);
+            } else {
+                // timed out
+                if (currentRole == ServerRole.LEADER) {
+                    sendHeartbeat();
+                } else {
+                    startElection();
+                }
             }
         }
     }
 
+    private void startElection() {
+        currentRole = ServerRole.CANDIDATE;
+        long newTerm = persistentState.getCurrentTerm() + 1;
+        persistentState.setCurrentTerm(newTerm);
+        LogEntry lastLogEntry = getLastLogEntry();
+
+        RequestVoteRequest voteRequest = new RequestVoteRequest(
+            newTerm,
+            myId,
+            lastLogEntry == null ? 0 : lastLogEntry.getIndex(),
+            lastLogEntry == null ? 0 : lastLogEntry.getTerm()
+        );
+
+        sendToAll(voteRequest);
+
+        this.nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+    }
+
     @Override
     public void onAppendEntriesRequest(AppendEntriesRequest aeReq) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        AppendEntriesResponse response = null;
+        if (aeReq.getTerm() >= persistentState.getCurrentTerm()) {
+            nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+        }
     }
 
     @Override
@@ -130,17 +171,48 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteResponse(RequestVoteResponse rvResp) {
+        // TODO: is this safeguarded against repeated votes?
         if (currentRole == ServerRole.CANDIDATE &&
             rvResp.isVoteGranted() &&
             votes++ >= peers.size() / 2) {
 
             // I've won! (as least as far as I'm concerned
             currentRole = ServerRole.LEADER;
+            currentLeaderId = myId;
+            sendHeartbeat();
         }
     }
 
     @Override
     public void onNewEntryRequest(NewEntryRequest neReq) {
-        //To change body of implemented methods use File | Settings | File Templates.
+
     }
+
+    public int getMyId() {
+        return myId;
+    }
+
+    private void sendHeartbeat() {
+        if (currentRole != ServerRole.LEADER) {
+            throw new IllegalStateException("Only the leader should send heartbeats");
+        }
+        AppendEntriesRequest heartbeat = new AppendEntriesRequest(
+            persistentState.getCurrentTerm(),
+            myId,
+            -1,
+            -1,
+            Collections.<LogEntry>emptyList(),
+            commitIndex
+        );
+
+        sendToAll(heartbeat);
+        this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
+    }
+
+    private void sendToAll(RpcMessage message) {
+        peers.forEach(recipient -> messageDispatcher.sendMessage(recipient, message));
+    }
+
+
+
 }
