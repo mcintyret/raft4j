@@ -23,6 +23,8 @@ public interface PersistentState {
 
     LogEntry getLogEntry(long logIndex);
 
+    LogEntry getLastLogEntry();
+
     void appendLogEntry(LogEntry newEntry);
 
 }

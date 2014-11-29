@@ -50,6 +50,11 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
+    public LogEntry getLastLogEntry() {
+        return logEntries.isEmpty() ? null : logEntries.get(logEntries.size() - 1);
+    }
+
+    @Override
     public void appendLogEntry(LogEntry newEntry) {
         logEntries.add(newEntry);
     }
