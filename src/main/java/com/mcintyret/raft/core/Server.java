@@ -76,7 +76,10 @@ public class Server implements RpcMessageVisitor {
             RpcMessage message = messageQueue.poll();
 
             if (message != null) {
-                if (!(message instanceof NewEntryRequest) && message.getTerm() > persistentState.getCurrentTerm()) {
+                // If I'm not already a follower, and someone else's term > mine, then I should become a follower
+                if ( currentRole != ServerRole.FOLLOWER &&
+                    !(message instanceof NewEntryRequest)
+                    && message.getTerm() > persistentState.getCurrentTerm()) {
                     currentRole = ServerRole.FOLLOWER;
                 }
                 message.visit(this);
