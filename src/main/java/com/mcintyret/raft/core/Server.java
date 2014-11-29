@@ -47,10 +47,18 @@ public class Server implements RpcMessageVisitor {
 
     private long electionTimeout;
 
+    // candidate only
+    private int votes;
+
     public Server(int myId, List<Integer> peers,
                   PersistentState persistentState,
                   ElectionTimeoutGenerator electionTimeoutGenerator,
                   MessageDispatcher messageDispatcher) {
+        // TODO: do I actually need this constraint? Isn't the point of election timeouts to deal with split votes?
+        if (peers.size() % 2 != 0) {
+            throw new IllegalArgumentException("Must be an even number of peers (and so an odd number of servers" +
+                " including myself) so that a majority can be reached.");
+        }
         this.myId = myId;
         this.peers = peers;
         this.persistentState = persistentState;
@@ -68,6 +76,9 @@ public class Server implements RpcMessageVisitor {
             RpcMessage message = messageQueue.poll();
 
             if (message != null) {
+                if (!(message instanceof NewEntryRequest) && message.getTerm() > persistentState.getCurrentTerm()) {
+                    currentRole = ServerRole.FOLLOWER;
+                }
                 message.visit(this);
             }
         }
@@ -116,7 +127,13 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteResponse(RequestVoteResponse rvResp) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        if (currentRole == ServerRole.CANDIDATE &&
+            rvResp.isVoteGranted() &&
+            votes++ >= peers.size() / 2) {
+
+            // I've won! (as least as far as I'm concerned
+            currentRole = ServerRole.LEADER;
+        }
     }
 
     @Override
