@@ -73,7 +73,7 @@ public class Server implements RpcMessageVisitor {
         this.electionTimeoutGenerator = electionTimeoutGenerator;
         this.messageDispatcher = messageDispatcher;
 
-        this.nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+        resetElectionTimeout();
         this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
     }
 
@@ -122,15 +122,19 @@ public class Server implements RpcMessageVisitor {
 
         sendToAll(voteRequest);
 
-        this.nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+        resetElectionTimeout();
     }
 
     @Override
     public void onAppendEntriesRequest(AppendEntriesRequest aeReq) {
         AppendEntriesResponse response = null;
         if (aeReq.getTerm() >= persistentState.getCurrentTerm()) {
-            nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+            resetElectionTimeout();
         }
+    }
+
+    private void resetElectionTimeout() {
+        nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
     }
 
     @Override
@@ -212,7 +216,4 @@ public class Server implements RpcMessageVisitor {
     private void sendToAll(RpcMessage message) {
         peers.forEach(recipient -> messageDispatcher.sendMessage(recipient, message));
     }
-
-
-
 }
