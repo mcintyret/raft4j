@@ -23,4 +23,8 @@ public class Multiset<T> {
         return map.getOrDefault(t, 0L);
     }
 
+    public void clear(T t) {
+        map.remove(t);
+    }
+
 }
