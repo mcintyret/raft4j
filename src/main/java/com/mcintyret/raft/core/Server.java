@@ -10,6 +10,8 @@ import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +24,8 @@ import java.util.concurrent.TimeUnit;
  * Date: 11/29/14
  */
 public class Server implements RpcMessageVisitor {
+
+    private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
     // TODO: configurable?
     private static final long HEARTBEAT_TIMEOUT = 200;
