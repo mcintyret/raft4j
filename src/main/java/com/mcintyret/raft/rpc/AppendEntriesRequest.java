@@ -29,6 +29,7 @@ public class AppendEntriesRequest implements RpcMessage {
         this.leaderCommit = leaderCommit;
     }
 
+    @Override
     public long getTerm() {
         return term;
     }

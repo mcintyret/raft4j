@@ -8,4 +8,6 @@ public interface RpcMessage {
 
     void visit(RpcMessageVisitor visitor);
 
+    long getTerm();
+
 }

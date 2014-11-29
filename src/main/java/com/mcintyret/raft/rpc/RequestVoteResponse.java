@@ -15,6 +15,7 @@ public class RequestVoteResponse implements RpcMessage {
         this.voteGranted = voteGranted;
     }
 
+    @Override
     public long getTerm() {
         return term;
     }

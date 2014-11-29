@@ -15,6 +15,7 @@ public class AppendEntriesResponse implements RpcMessage {
         this.success = success;
     }
 
+    @Override
     public long getTerm() {
         return term;
     }

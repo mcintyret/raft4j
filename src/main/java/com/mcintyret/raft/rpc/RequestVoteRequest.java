@@ -21,6 +21,7 @@ public class RequestVoteRequest implements RpcMessage {
         this.lastLogTerm = lastLogTerm;
     }
 
+    @Override
     public long getTerm() {
         return term;
     }
