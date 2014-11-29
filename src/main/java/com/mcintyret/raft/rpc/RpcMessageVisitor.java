@@ -14,4 +14,6 @@ public interface RpcMessageVisitor {
 
     void onRequestVoteResponse(RequestVoteResponse rvResp);
 
+    void onNewEntryRequest(NewEntryRequest neReq);
+
 }

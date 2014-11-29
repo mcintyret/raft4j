@@ -2,6 +2,7 @@ package com.mcintyret.raft.core;
 
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
+import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
@@ -71,6 +72,11 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteResponse(RequestVoteResponse rvResp) {
+        //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public void onNewEntryRequest(NewEntryRequest neReq) {
         //To change body of implemented methods use File | Settings | File Templates.
     }
 }
