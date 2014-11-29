@@ -1,6 +1,7 @@
 package com.mcintyret.raft.core;
 
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
+import com.mcintyret.raft.message.MessageDispatcher;
 import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
@@ -28,10 +29,11 @@ public class Server implements RpcMessageVisitor {
     // TODO: remove this assumption!
     private final List<Integer> peers;
 
-    // TODO: inject
     private final PersistentState persistentState;
 
     private final ElectionTimeoutGenerator electionTimeoutGenerator;
+
+    private final MessageDispatcher messageDispatcher;
 
     // All messages are processed in a single thread, simplifying the logic
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
@@ -45,11 +47,15 @@ public class Server implements RpcMessageVisitor {
 
     private long electionTimeout;
 
-    public Server(int myId, List<Integer> peers, PersistentState persistentState, ElectionTimeoutGenerator electionTimeoutGenerator) {
+    public Server(int myId, List<Integer> peers,
+                  PersistentState persistentState,
+                  ElectionTimeoutGenerator electionTimeoutGenerator,
+                  MessageDispatcher messageDispatcher) {
         this.myId = myId;
         this.peers = peers;
         this.persistentState = persistentState;
         this.electionTimeoutGenerator = electionTimeoutGenerator;
+        this.messageDispatcher = messageDispatcher;
     }
 
     public void messageReceived(RpcMessage message) {
@@ -79,7 +85,33 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteRequest(RequestVoteRequest rvReq) {
-        //To change body of implemented methods use File | Settings | File Templates.
+        // Same behaviour for all states
+        RequestVoteResponse response = null;
+        long currentTerm = persistentState.getCurrentTerm();
+
+        if (rvReq.getTerm() >= currentTerm) {
+            int votedFor = persistentState.getVotedFor();
+            // if we haven't voted for someone else already...
+            if ((votedFor == -1 || votedFor == rvReq.getCandidateId())) {
+                // ...and this candidate is at lease as up-to-date as we are
+                LogEntry lastLogEntry = getLastLogEntry();
+                if (lastLogEntry == null || rvReq.getLastLogTerm() > lastLogEntry.getTerm() ||
+                    (rvReq.getLastLogTerm() == lastLogEntry.getTerm() && rvReq.getLastLogIndex() >= lastLogEntry.getIndex())) {
+
+                    response = new RequestVoteResponse(currentTerm, true);
+                }
+            }
+        }
+
+        if (response == null) {
+            response = new RequestVoteResponse(currentTerm, false);
+        }
+
+        messageDispatcher.sendMessage(rvReq.getCandidateId(), response);
+    }
+
+    private LogEntry getLastLogEntry() {
+        return commitIndex == 0 ? null : persistentState.getLogEntry(commitIndex);
     }
 
     @Override
