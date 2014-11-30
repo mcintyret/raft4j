@@ -11,6 +11,7 @@ import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
+import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +53,8 @@ public class Server implements RpcMessageVisitor {
 
     private final MessageDispatcher messageDispatcher;
 
+    private final StateMachine stateMachine;
+
     // All messages are processed in a single thread, simplifying the logic
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
 
@@ -82,7 +85,8 @@ public class Server implements RpcMessageVisitor {
     public Server(int myId, List<Integer> peers,
                   PersistentState persistentState,
                   ElectionTimeoutGenerator electionTimeoutGenerator,
-                  MessageDispatcher messageDispatcher) {
+                  MessageDispatcher messageDispatcher,
+                  StateMachine stateMachine) {
         // TODO: do I actually need this constraint? Isn't the point of election timeouts to deal with split votes?
         if (peers.size() % 2 != 0) {
             throw new IllegalArgumentException("Must be an even number of peers (and so an odd number of servers" +
@@ -93,6 +97,7 @@ public class Server implements RpcMessageVisitor {
         this.persistentState = persistentState;
         this.electionTimeoutGenerator = electionTimeoutGenerator;
         this.messageDispatcher = messageDispatcher;
+        this.stateMachine = stateMachine;
 
         resetElectionTimeout();
         this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
@@ -119,6 +124,8 @@ public class Server implements RpcMessageVisitor {
             if (message != null) {
                 checkTerm(message);
                 message.visit(this);
+
+                updateStateMachine();
             } else {
                 // timed out
                 if (currentRole == ServerRole.LEADER) {
@@ -127,6 +134,15 @@ public class Server implements RpcMessageVisitor {
                     startElection();
                 }
             }
+        }
+    }
+
+    private void updateStateMachine() {
+        if (commitIndex > lastApplied) {
+            List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastApplied + 1, commitIndex + 1);
+            toApply.forEach(entry -> stateMachine.apply(entry.getIndex(), entry.getData()));
+
+            lastApplied = commitIndex;
         }
     }
 

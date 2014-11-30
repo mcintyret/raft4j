@@ -5,6 +5,9 @@ import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
 import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.rpc.RpcMessage;
+import com.mcintyret.raft.state.StateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +18,18 @@ import java.util.List;
  * Date: 11/29/14
  */
 public class Runner {
+
+    private enum LoggingStateMachine implements StateMachine {
+        INSTANCE;
+
+        @Override
+        public void apply(long index, byte[] data) {
+            LOG.info("Index: {}, data: {}", index, new String(data));
+        }
+
+        private static final Logger LOG = LoggerFactory.getLogger("StateMachine");
+
+    }
 
     public static void main(String[] args) {
         int size = 5;
@@ -33,7 +48,8 @@ public class Runner {
             servers.add(new Server(i, peers,
                 new InMemoryPersistentState(),
                 new RandomElectionTimeoutGenerator(100L, 200L),
-                messageDispatcher));
+                messageDispatcher,
+                LoggingStateMachine.INSTANCE));
         }
 
         // Start them all!
