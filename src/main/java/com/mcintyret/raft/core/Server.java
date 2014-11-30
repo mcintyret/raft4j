@@ -169,12 +169,18 @@ public class Server implements RpcMessageVisitor {
 
             LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
+            List<LogEntry> entries = aeReq.getEntries();
             if (lastLogEntry.getTerm() == aeReq.getPrevLogTerm() &&
                 lastLogEntry.getIndex() == aeReq.getPrevLogIndex()) {
 
                 // Success!
-                aeReq.getEntries().forEach(persistentState::appendLogEntry);
+                entries.forEach(persistentState::appendLogEntry);
                 success = true;
+
+            }
+
+            if (aeReq.getLeaderCommit() > commitIndex && !entries.isEmpty()) {
+                commitIndex = Math.min(aeReq.getLeaderCommit(), entries.get(entries.size() - 1).getIndex());
             }
         }
 
