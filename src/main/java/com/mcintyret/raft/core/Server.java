@@ -172,7 +172,6 @@ public class Server implements RpcMessageVisitor {
 
             LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
-            // TODO: delete conflicting entries
             List<LogEntry> entries = aeReq.getEntries();
             if (lastLogEntry.getTerm() == aeReq.getPrevLogTerm() &&
                 lastLogEntry.getIndex() == aeReq.getPrevLogIndex()) {
