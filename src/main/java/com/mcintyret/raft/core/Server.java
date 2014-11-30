@@ -176,7 +176,7 @@ public class Server implements RpcMessageVisitor {
                 lastLogEntry.getIndex() == aeReq.getPrevLogIndex()) {
 
                 // Success!
-                entries.forEach(persistentState::appendLogEntry);
+                persistentState.deleteConflictingAndAppend(entries);
                 success = true;
 
             }

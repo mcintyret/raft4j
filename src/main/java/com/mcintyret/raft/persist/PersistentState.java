@@ -25,10 +25,27 @@ public interface PersistentState {
 
     List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex);
 
+    /**
+     * Gets the log entry at the 1-based index
+     */
     LogEntry getLogEntry(long logIndex);
 
     LogEntry getLastLogEntry();
 
+    /**
+     * Simply appends a log entry to the end of the log.
+     *
+     * This is for Leaders appending entirely new entries received from clients
+     */
     void appendLogEntry(LogEntry newEntry);
+
+    /**
+     * Appends the given log entries to this node's log.
+     *
+     * If there are any existing entries which conflict with the new ones they, and all entries after them, are deleted.
+     *
+     * This is for Followers appending entries sent from the Leader
+     */
+    void deleteConflictingAndAppend(List<LogEntry> entries);
 
 }

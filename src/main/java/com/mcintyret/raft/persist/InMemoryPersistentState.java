@@ -60,7 +60,25 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
+    public void deleteConflictingAndAppend(List<LogEntry> entries) {
+        int listIndex = -1;
+        for (LogEntry entry : entries) {
+            listIndex = (int) (entry.getIndex() - 1);
+            if (entries.size() <= listIndex) {
+                entries.add(entry);
+            } else {
+                entries.set(listIndex, entry);
+            }
+        }
+
+        for (int i = listIndex; i < logEntries.size(); i++) {
+            logEntries.remove(i);
+        }
+    }
+
+    @Override
     public void appendLogEntry(LogEntry newEntry) {
         logEntries.add(newEntry);
     }
+
 }
