@@ -121,7 +121,7 @@ public class Server implements RpcMessageVisitor {
             } else {
                 // timed out
                 if (currentRole == ServerRole.LEADER) {
-                    sendHeartbeat();
+                    sendAppendEntriesRequests(false);
                 } else {
                     startElection();
                 }
@@ -267,7 +267,7 @@ public class Server implements RpcMessageVisitor {
                 // I've won! (as least as far as I'm concerned...
                 currentRole = ServerRole.LEADER;
                 currentLeaderId = myId;
-                sendHeartbeat();
+                sendAppendEntriesRequests(true);
             }
         }
     }
@@ -294,9 +294,9 @@ public class Server implements RpcMessageVisitor {
         return myId;
     }
 
-    private void sendHeartbeat() {
+    private void sendAppendEntriesRequests(boolean heartbeat) {
         if (currentRole != ServerRole.LEADER) {
-            throw new IllegalStateException("Only the leader should send heartbeats");
+            throw new IllegalStateException("Only the leader should send AppendEntriesRequests");
         }
 
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
@@ -304,36 +304,11 @@ public class Server implements RpcMessageVisitor {
         peers.forEach(recipient -> {
             int peerIndex = getIndexForPeer(recipient);
 
-            AppendEntriesRequest heartbeat = new AppendEntriesRequest(
-                persistentState.getCurrentTerm(),
-                myId,
-                recipient,
-                nextIndices[peerIndex] - 1,
-                lastLogEntry.getTerm(), // TODO: what should go here?
-                Collections.<LogEntry>emptyList(),
-                commitIndex
-            );
-            appendEntriesRequests.put(heartbeat.getRequestId(), heartbeat);
-
-            messageDispatcher.sendMessage(recipient, heartbeat);
-        });
-
-        this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
-    }
-
-    private void sendLogUpdateMessages() {
-        if (currentRole != ServerRole.LEADER) {
-            throw new IllegalStateException("Only the leader should send heartbeats");
-        }
-
-        LogEntry lastLogEntry = persistentState.getLastLogEntry();
-
-        peers.forEach(recipient -> {
-            int peerIndex = getIndexForPeer(recipient);
-
-            // Everything from the last-seen to now
-            List<LogEntry> logsToSend = persistentState.getLogEntriesBetween(nextIndices[peerIndex], lastLogEntry.getIndex() + 1);
             LogEntry previousForPeer = persistentState.getLogEntry(nextIndices[peerIndex] - 1);
+
+            List<LogEntry> logsToSend = heartbeat ? Collections.<LogEntry>emptyList() :
+                // Everything from the last-seen to now. If this turns out to be empty this is essentially a heartbeat.
+                persistentState.getLogEntriesBetween(nextIndices[peerIndex], lastLogEntry.getIndex() + 1);
 
             AppendEntriesRequest request = new AppendEntriesRequest(
                 persistentState.getCurrentTerm(),
