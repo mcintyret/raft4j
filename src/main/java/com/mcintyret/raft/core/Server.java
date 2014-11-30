@@ -7,6 +7,7 @@ import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
 import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.NewEntryResponse;
+import com.mcintyret.raft.rpc.RaftRpcMessage;
 import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
@@ -122,7 +123,9 @@ public class Server implements RpcMessageVisitor {
             }
 
             if (message != null) {
-                checkTerm(message);
+                if (message instanceof RaftRpcMessage) {
+                    checkTerm((RaftRpcMessage) message);
+                }
                 message.visit(this);
 
                 updateStateMachine();
@@ -147,8 +150,8 @@ public class Server implements RpcMessageVisitor {
     }
 
     // If someone else's term > mine, then I should become a follower and update my term
-    private void checkTerm(RpcMessage message) {
-        if (!(message instanceof NewEntryRequest) && message.getTerm() > persistentState.getCurrentTerm()) {
+    private void checkTerm(RaftRpcMessage message) {
+        if (message.getTerm() > persistentState.getCurrentTerm()) {
             currentRole = ServerRole.FOLLOWER;
             persistentState.setCurrentTerm(message.getTerm());
         }

@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class RequestVoteResponse implements RpcMessage {
+public class RequestVoteResponse implements RaftRpcMessage {
 
     private final int voterId;
 

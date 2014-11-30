@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class RequestVoteRequest implements RpcMessage {
+public class RequestVoteRequest implements RaftRpcMessage {
 
     private final long term;
 

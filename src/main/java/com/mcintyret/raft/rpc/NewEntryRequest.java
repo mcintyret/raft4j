@@ -23,9 +23,4 @@ public class NewEntryRequest implements RpcMessage {
         visitor.onNewEntryRequest(this);
     }
 
-    @Override
-    public long getTerm() {
-        // TODO: redesign so I don't need to do this?
-        throw new UnsupportedOperationException();
-    }
 }

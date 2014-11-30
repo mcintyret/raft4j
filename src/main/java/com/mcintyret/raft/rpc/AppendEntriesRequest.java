@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesRequest implements RpcMessage {
+public class AppendEntriesRequest implements RaftRpcMessage {
 
     private static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
 

@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesResponse implements RpcMessage {
+public class AppendEntriesResponse implements RaftRpcMessage {
 
     private final long requestId;
 
