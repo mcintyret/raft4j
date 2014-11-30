@@ -10,6 +10,8 @@ import java.util.List;
  */
 public interface PersistentState {
 
+    public static final LogEntry EMPTY_LOG = new LogEntry(0, 0, null);
+
     long getCurrentTerm();
 
     void setCurrentTerm(long currentTerm);

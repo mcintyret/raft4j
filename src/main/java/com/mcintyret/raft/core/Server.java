@@ -120,13 +120,13 @@ public class Server implements RpcMessageVisitor {
         currentRole = ServerRole.CANDIDATE;
         long newTerm = persistentState.getCurrentTerm() + 1;
         persistentState.setCurrentTerm(newTerm);
-        LogEntry lastLogEntry = getLastLogEntry();
+        LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
         RequestVoteRequest voteRequest = new RequestVoteRequest(
             newTerm,
             myId,
-            lastLogEntry == null ? 0 : lastLogEntry.getIndex(),
-            lastLogEntry == null ? 0 : lastLogEntry.getTerm()
+            lastLogEntry.getIndex(),
+            lastLogEntry.getTerm()
         );
 
         sendToAll(voteRequest);
@@ -162,8 +162,8 @@ public class Server implements RpcMessageVisitor {
             // if we haven't voted for someone else already...
             if ((votedFor == -1 || votedFor == rvReq.getCandidateId())) {
                 // ...and this candidate is at lease as up-to-date as we are
-                LogEntry lastLogEntry = getLastLogEntry();
-                if (lastLogEntry == null || rvReq.getLastLogTerm() > lastLogEntry.getTerm() ||
+                LogEntry lastLogEntry = persistentState.getLastLogEntry();
+                if (rvReq.getLastLogTerm() > lastLogEntry.getTerm() ||
                     (rvReq.getLastLogTerm() == lastLogEntry.getTerm() && rvReq.getLastLogIndex() >= lastLogEntry.getIndex())) {
 
                     response = new RequestVoteResponse(currentTerm, true);
@@ -176,10 +176,6 @@ public class Server implements RpcMessageVisitor {
         }
 
         messageDispatcher.sendMessage(rvReq.getCandidateId(), response);
-    }
-
-    private LogEntry getLastLogEntry() {
-        return commitIndex == 0 ? null : persistentState.getLogEntry(commitIndex);
     }
 
     @Override
