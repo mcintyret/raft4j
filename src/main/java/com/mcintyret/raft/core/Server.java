@@ -201,7 +201,6 @@ public class Server implements RpcMessageVisitor {
 
             if (aeReq.getLeaderCommit() > commitIndex && !entries.isEmpty()) {
                 commitIndex = Math.min(aeReq.getLeaderCommit(), entries.get(entries.size() - 1).getIndex());
-                // TODO: apply to state machine
             }
         }
 
@@ -240,8 +239,6 @@ public class Server implements RpcMessageVisitor {
                         commitIndex = index;
                     }
                 });
-                // TODO: apply newly-committed entries!
-
             }
         } else {
             nextIndices[peerIndex]--; // TODO: smarter algorithm here?
