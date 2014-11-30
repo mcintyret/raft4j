@@ -36,7 +36,7 @@ public class Server implements RpcMessageVisitor {
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
     // TODO: configurable?
-    private static final long HEARTBEAT_TIMEOUT = 20;
+    private static final long HEARTBEAT_TIMEOUT = 50;
 
     private final int myId;
 

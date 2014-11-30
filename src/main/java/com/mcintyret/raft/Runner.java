@@ -47,7 +47,7 @@ public class Runner {
             peers.remove((Integer) i);
             servers.add(new Server(i, peers,
                 new InMemoryPersistentState(),
-                new RandomElectionTimeoutGenerator(100L, 200L),
+                new RandomElectionTimeoutGenerator(300L, 400L),
                 messageDispatcher,
                 LoggingStateMachine.INSTANCE));
         }
