@@ -60,7 +60,7 @@ public class Server implements RpcMessageVisitor {
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
 
     // TODO: behaviour by polymorphism, rather than switching on this
-    private ServerRole currentRole = ServerRole.CANDIDATE; // At startup, every server is a candidate
+    private ServerRole currentRole = ServerRole.FOLLOWER; // At startup, every server is a follower
 
     private final Multiset<Long> indicesAwaitingCommit = new Multiset<>();
 
