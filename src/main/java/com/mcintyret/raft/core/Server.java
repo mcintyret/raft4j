@@ -127,10 +127,9 @@ public class Server implements RpcMessageVisitor {
         }
     }
 
-    // If I'm not already a follower, and someone else's term > mine, then I should become a follower
+    // If someone else's term > mine, then I should become a follower and update my term
     private void checkTerm(RpcMessage message) {
-        if (currentRole != ServerRole.FOLLOWER && !(message instanceof NewEntryRequest)
-            && message.getTerm() > persistentState.getCurrentTerm()) {
+        if (!(message instanceof NewEntryRequest) && message.getTerm() > persistentState.getCurrentTerm()) {
             currentRole = ServerRole.FOLLOWER;
             persistentState.setCurrentTerm(message.getTerm());
         }
@@ -141,6 +140,8 @@ public class Server implements RpcMessageVisitor {
         votes = 0; // reset
         long newTerm = persistentState.getCurrentTerm() + 1;
         persistentState.setCurrentTerm(newTerm);
+
+        // TODO: is this correct? Or should it be last COMMITTED log entry?
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
         RequestVoteRequest voteRequest = new RequestVoteRequest(
@@ -169,6 +170,7 @@ public class Server implements RpcMessageVisitor {
 
             LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
+            // TODO: delete conflicting entries
             List<LogEntry> entries = aeReq.getEntries();
             if (lastLogEntry.getTerm() == aeReq.getPrevLogTerm() &&
                 lastLogEntry.getIndex() == aeReq.getPrevLogIndex()) {
@@ -181,6 +183,7 @@ public class Server implements RpcMessageVisitor {
 
             if (aeReq.getLeaderCommit() > commitIndex && !entries.isEmpty()) {
                 commitIndex = Math.min(aeReq.getLeaderCommit(), entries.get(entries.size() - 1).getIndex());
+                // TODO: apply to state machine
             }
         }
 
