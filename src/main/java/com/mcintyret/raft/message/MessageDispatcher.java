@@ -9,6 +9,7 @@ import com.mcintyret.raft.rpc.RpcMessage;
 public interface MessageDispatcher {
 
     // Todo: handle exceptions?
+    // TODO: retry indefinitely (this is a key part of raft!)
     void sendMessage(int recipientId, RpcMessage message);
 
 }

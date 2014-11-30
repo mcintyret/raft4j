@@ -6,20 +6,16 @@ package com.mcintyret.raft.rpc;
  */
 public class AppendEntriesResponse implements RpcMessage {
 
-    private final int responderId;
+    private final long requestId;
 
     private final long term;
 
     private final boolean success;
 
-    public AppendEntriesResponse(int responderId, long term, boolean success) {
-        this.responderId = responderId;
+    public AppendEntriesResponse(long requestId, long term, boolean success) {
+        this.requestId = requestId;
         this.term = term;
         this.success = success;
-    }
-
-    public int getResponderId() {
-        return responderId;
     }
 
     @Override
@@ -29,6 +25,10 @@ public class AppendEntriesResponse implements RpcMessage {
 
     public boolean isSuccess() {
         return success;
+    }
+
+    public long getRequestId() {
+        return requestId;
     }
 
     @Override

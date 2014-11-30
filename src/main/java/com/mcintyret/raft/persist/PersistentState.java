@@ -21,7 +21,9 @@ public interface PersistentState {
 
     void setVotedFor(int votedFor);
 
-    List<LogEntry> getLogEntries();
+    List<LogEntry> getAllLogEntries();
+
+    List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex);
 
     LogEntry getLogEntry(long logIndex);
 

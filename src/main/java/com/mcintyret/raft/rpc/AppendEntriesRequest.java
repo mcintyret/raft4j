@@ -3,6 +3,7 @@ package com.mcintyret.raft.rpc;
 import com.mcintyret.raft.core.LogEntry;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * User: tommcintyre
@@ -10,9 +11,15 @@ import java.util.List;
  */
 public class AppendEntriesRequest implements RpcMessage {
 
+    private static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
+
+    private final long requestId = REQUEST_ID_GEN.incrementAndGet();
+
     private final long term;
 
     private final int leaderId;
+
+    private final int targetId;
 
     private final long prevLogIndex;
 
@@ -22,13 +29,22 @@ public class AppendEntriesRequest implements RpcMessage {
 
     private final long leaderCommit;
 
-    public AppendEntriesRequest(long term, int leaderId, long prevLogIndex, long prevLogTerm, List<LogEntry> entries, long leaderCommit) {
+    public AppendEntriesRequest(long term, int leaderId, int targetId, long prevLogIndex, long prevLogTerm, List<LogEntry> entries, long leaderCommit) {
         this.term = term;
         this.leaderId = leaderId;
+        this.targetId = targetId;
         this.prevLogIndex = prevLogIndex;
         this.prevLogTerm = prevLogTerm;
         this.entries = entries;
         this.leaderCommit = leaderCommit;
+    }
+
+    public long getRequestId() {
+        return requestId;
+    }
+
+    public int getTargetId() {
+        return targetId;
     }
 
     @Override

@@ -40,8 +40,13 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
-    public List<LogEntry> getLogEntries() {
+    public List<LogEntry> getAllLogEntries() {
         return Collections.unmodifiableList(logEntries);
+    }
+
+    @Override
+    public List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex) {
+        return Collections.unmodifiableList(new ArrayList<>(logEntries.subList((int) fromIndex, (int) toIndex)));
     }
 
     @Override
