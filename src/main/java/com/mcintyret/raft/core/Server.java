@@ -17,8 +17,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -68,7 +70,7 @@ public class Server implements RpcMessageVisitor {
     private long nextHeartbeat;
 
     // candidate only
-    private int votes;
+    private final Set<Integer> votes = new HashSet<>();
 
     // leader only
     private final long[] nextIndices;
@@ -137,7 +139,7 @@ public class Server implements RpcMessageVisitor {
 
     private void startElection() {
         currentRole = ServerRole.CANDIDATE;
-        votes = 0; // reset
+        votes.clear(); // reset
         long newTerm = persistentState.getCurrentTerm() + 1;
         persistentState.setCurrentTerm(newTerm);
 
@@ -232,9 +234,8 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteRequest(RequestVoteRequest rvReq) {
-        // Same behaviour for all states
-        RequestVoteResponse response = null;
         long currentTerm = persistentState.getCurrentTerm();
+        boolean voteGranted = false;
 
         if (rvReq.getTerm() >= currentTerm) {
             int votedFor = persistentState.getVotedFor();
@@ -245,14 +246,12 @@ public class Server implements RpcMessageVisitor {
                 if (rvReq.getLastLogTerm() > lastLogEntry.getTerm() ||
                     (rvReq.getLastLogTerm() == lastLogEntry.getTerm() && rvReq.getLastLogIndex() >= lastLogEntry.getIndex())) {
 
-                    response = new RequestVoteResponse(currentTerm, true);
+                    voteGranted = true;
                 }
             }
         }
 
-        if (response == null) {
-            response = new RequestVoteResponse(currentTerm, false);
-        }
+        RequestVoteResponse response = new RequestVoteResponse(myId, currentTerm, voteGranted);
 
         messageDispatcher.sendMessage(rvReq.getCandidateId(), response);
     }
@@ -260,15 +259,16 @@ public class Server implements RpcMessageVisitor {
 
     @Override
     public void onRequestVoteResponse(RequestVoteResponse rvResp) {
-        // TODO: is this safeguarded against repeated votes?
-        if (currentRole == ServerRole.CANDIDATE &&
-            rvResp.isVoteGranted() &&
-            votes++ >= majoritySize) {
+        if (currentRole == ServerRole.CANDIDATE && rvResp.isVoteGranted()) {
+            votes.add(rvResp.getVoterId());
 
-            // I've won! (as least as far as I'm concerned
-            currentRole = ServerRole.LEADER;
-            currentLeaderId = myId;
-            sendHeartbeat();
+            if (votes.size() >= majoritySize) {
+
+                // I've won! (as least as far as I'm concerned...
+                currentRole = ServerRole.LEADER;
+                currentLeaderId = myId;
+                sendHeartbeat();
+            }
         }
     }
 

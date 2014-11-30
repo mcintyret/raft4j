@@ -6,13 +6,20 @@ package com.mcintyret.raft.rpc;
  */
 public class RequestVoteResponse implements RpcMessage {
 
+    private final int voterId;
+
     private final long term;
 
     private final boolean voteGranted;
 
-    public RequestVoteResponse(long term, boolean voteGranted) {
+    public RequestVoteResponse(int voterId, long term, boolean voteGranted) {
+        this.voterId = voterId;
         this.term = term;
         this.voteGranted = voteGranted;
+    }
+
+    public int getVoterId() {
+        return voterId;
     }
 
     @Override
