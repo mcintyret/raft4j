@@ -15,6 +15,7 @@ import com.mcintyret.raft.util.Multiset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -264,11 +265,19 @@ public class Server implements RpcMessageVisitor {
             if (votes.size() >= majoritySize) {
 
                 // I've won! (as least as far as I'm concerned...
-                currentRole = ServerRole.LEADER;
-                currentLeaderId = myId;
-                sendAppendEntriesRequests(true);
+                becomeLeader();
             }
         }
+    }
+
+    private void becomeLeader() {
+        currentRole = ServerRole.LEADER;
+        currentLeaderId = myId;
+        sendAppendEntriesRequests(true);
+
+        // TODO: Again, should this be the last COMMITTED index?
+        LogEntry lastLogEntry = persistentState.getLastLogEntry();
+        Arrays.fill(nextIndices, lastLogEntry.getIndex() + 1);
     }
 
     @Override
