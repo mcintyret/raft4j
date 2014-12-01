@@ -2,8 +2,6 @@ package com.mcintyret.raft.message;
 
 import com.mcintyret.raft.client.ClientMessage;
 import com.mcintyret.raft.rpc.Message;
-import com.mcintyret.raft.rpc.RaftRpcMessage;
-import com.mcintyret.raft.rpc.RpcMessage;
 
 /**
  * User: tommcintyre

@@ -3,7 +3,6 @@ package com.mcintyret.raft.rpc;
 import com.mcintyret.raft.core.LogEntry;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * User: tommcintyre
