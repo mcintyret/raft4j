@@ -67,8 +67,6 @@ public class Server implements RpcMessageVisitor {
 
     private long commitIndex;
 
-    private long lastApplied;
-
     private long nextElectionTimeout;
 
     private long nextHeartbeat;
@@ -149,11 +147,12 @@ public class Server implements RpcMessageVisitor {
     }
 
     private void updateStateMachine() {
+        long lastApplied = stateMachine.getLastApplied();
         if (commitIndex > lastApplied) {
             List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastApplied + 1, commitIndex + 1);
             toApply.forEach(entry -> stateMachine.apply(entry.getIndex(), entry.getData()));
 
-            lastApplied = commitIndex;
+            stateMachine.setLastApplied(commitIndex);
         }
     }
 
