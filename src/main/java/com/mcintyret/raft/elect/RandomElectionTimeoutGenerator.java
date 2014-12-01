@@ -32,7 +32,7 @@ public class RandomElectionTimeoutGenerator implements ElectionTimeoutGenerator 
     }
 
     @Override
-    public long nextElectionTimeout() {
+    public synchronized long nextElectionTimeout() {
         int diff = (int) (maximum - minimum);
         return System.currentTimeMillis() + minimum + random.nextInt(diff);
     }

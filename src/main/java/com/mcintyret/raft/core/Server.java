@@ -1,5 +1,17 @@
 package com.mcintyret.raft.core;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
 import com.mcintyret.raft.message.MessageHandler;
@@ -17,17 +29,6 @@ import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
 import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 /**
  * User: tommcintyre
@@ -122,7 +123,8 @@ public class Server implements RpcMessageVisitor {
             try {
                 message = messageQueue.poll(timeout, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
-                throw new AssertionError(e);
+                Thread.interrupted(); // dealt with
+                return;
             }
 
             if (message != null) {
