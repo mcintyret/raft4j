@@ -358,9 +358,21 @@ public class Server implements RpcMessageVisitor {
 
             LogEntry previousForPeer = persistentState.getLogEntry(nextIndices[peerIndex] - 1);
 
-            List<LogEntry> logsToSend = heartbeat ? Collections.<LogEntry>emptyList() :
+            List<LogEntry> logsToSend;
+            if (heartbeat) {
+                logsToSend = Collections.emptyList();
+            } else {
                 // Everything from the last-seen to now. If this turns out to be empty this is essentially a heartbeat.
-                persistentState.getLogEntriesBetween(nextIndices[peerIndex], lastLogEntry.getIndex() + 1);
+
+                // Go to this extra trouble so that we only hit PersistentState (ie Disk) when we need to
+                long fromIndex = nextIndices[peerIndex];
+                long toIndex = lastLogEntry.getIndex() + 1;
+                if (fromIndex == toIndex) {
+                    logsToSend = Collections.emptyList();
+                } else {
+                    logsToSend = persistentState.getLogEntriesBetween(fromIndex, toIndex);
+                }
+            }
 
             if (logsToSend.isEmpty()) {
                 LOG.info("Sending heartbeat to peer id={}", recipient);
