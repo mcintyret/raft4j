@@ -7,7 +7,7 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>output.log</file>
+        <file>logs/output.log</file>
         <encoder>
             <pattern>%date{ISO8601} [%thread] %-5p [%c{0}] - %m%n</pattern>
         </encoder>

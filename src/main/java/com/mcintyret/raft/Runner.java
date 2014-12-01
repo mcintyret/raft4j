@@ -3,6 +3,7 @@ package com.mcintyret.raft;
 import com.mcintyret.raft.client.Client;
 import com.mcintyret.raft.client.ClientMessage;
 import com.mcintyret.raft.core.Server;
+import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
 import com.mcintyret.raft.message.MessageHandler;
@@ -10,8 +11,8 @@ import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.rpc.Message;
 import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.NewEntryResponse;
-import com.mcintyret.raft.rpc.RaftRpcMessage;
 import com.mcintyret.raft.rpc.RpcMessage;
+import com.mcintyret.raft.state.FileWritingStateMachine;
 import com.mcintyret.raft.state.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,15 +65,16 @@ public class Runner {
         };
 
         List<Integer> allIds = makeAllIds(size);
+        ElectionTimeoutGenerator electionTimeoutGenerator = new RandomElectionTimeoutGenerator(5000L, 6000L);
 
         for (int i = 0; i < size; i++) {
             List<Integer> peers = new ArrayList<>(allIds);
             peers.remove((Integer) i);
             servers.add(new Server(i, peers,
                 new InMemoryPersistentState(),
-                new RandomElectionTimeoutGenerator(5000L, 6000L),
+                electionTimeoutGenerator,
                 messageDispatcher,
-                LoggingStateMachine.INSTANCE));
+                new FileWritingStateMachine("logs/" + i + ".log")));
         }
 
         // Start them all!
