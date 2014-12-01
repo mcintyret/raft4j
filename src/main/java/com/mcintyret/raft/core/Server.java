@@ -2,9 +2,12 @@ package com.mcintyret.raft.core;
 
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
+import com.mcintyret.raft.message.MessageHandler;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
+import com.mcintyret.raft.rpc.BaseRequest;
+import com.mcintyret.raft.rpc.BaseResponse;
 import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.NewEntryResponse;
 import com.mcintyret.raft.rpc.RaftRpcMessage;
@@ -19,10 +22,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -37,7 +38,7 @@ public class Server implements RpcMessageVisitor {
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
     // TODO: configurable?
-    private static final long HEARTBEAT_TIMEOUT = 50;
+    private static final long HEARTBEAT_TIMEOUT = 1000;
 
     private final int myId;
 
@@ -59,9 +60,6 @@ public class Server implements RpcMessageVisitor {
     // All messages are processed in a single thread, simplifying the logic
     private final BlockingQueue<RpcMessage> messageQueue = new LinkedBlockingQueue<>();
 
-    // TODO: behaviour by polymorphism, rather than switching on this
-    private ServerRole currentRole = ServerRole.FOLLOWER; // At startup, every server is a follower
-
     private final Multiset<Long> indicesAwaitingCommit = new Multiset<>();
 
     private int currentLeaderId;
@@ -74,14 +72,15 @@ public class Server implements RpcMessageVisitor {
 
     private long nextHeartbeat;
 
+    private ServerRole currentRole;
+
     // candidate only
     private final Set<Integer> votes = new HashSet<>();
 
     // leader only
     private final long[] nextIndices;
 
-    // TODO: this can just keep growing if there aren't any responses - needs to be smarter
-    private final Map<Long, AppendEntriesRequest> appendEntriesRequests = new HashMap<>();
+    private final MessageHandler messageHandler = new MessageHandler();
 
     public Server(int myId, List<Integer> peers,
                   PersistentState persistentState,
@@ -101,9 +100,12 @@ public class Server implements RpcMessageVisitor {
         this.stateMachine = stateMachine;
 
         resetElectionTimeout();
-        this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
-        majoritySize = peers.size() / 2;
+        majoritySize = 1 + (peers.size() / 2);
         nextIndices = new long[peers.size()];
+    }
+
+    private void resetHeartbeat() {
+        this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
     }
 
     public void messageReceived(RpcMessage message) {
@@ -111,6 +113,7 @@ public class Server implements RpcMessageVisitor {
     }
 
     public void run() {
+        setRole(ServerRole.FOLLOWER, "start-up"); // at startup, every server is a follower
         while (true) {
             long timeout = (currentRole == ServerRole.LEADER ? nextHeartbeat :
                 nextElectionTimeout) - System.currentTimeMillis();
@@ -125,6 +128,9 @@ public class Server implements RpcMessageVisitor {
             if (message != null) {
                 if (message instanceof RaftRpcMessage) {
                     checkTerm((RaftRpcMessage) message);
+                }
+                if (message instanceof BaseResponse) {
+                    messageHandler.decorate((BaseResponse) message);
                 }
                 message.visit(this);
 
@@ -152,16 +158,21 @@ public class Server implements RpcMessageVisitor {
     // If someone else's term > mine, then I should become a follower and update my term
     private void checkTerm(RaftRpcMessage message) {
         if (message.getTerm() > persistentState.getCurrentTerm()) {
-            currentRole = ServerRole.FOLLOWER;
-            persistentState.setCurrentTerm(message.getTerm());
+            setRole(ServerRole.FOLLOWER, "found another server with a higher term");
+            updateTerm(message.getTerm(), "to match higher term seen on other server");
         }
     }
 
     private void startElection() {
-        currentRole = ServerRole.CANDIDATE;
+        setRole(ServerRole.CANDIDATE, "election timeout");
         votes.clear(); // reset
+
+        // vote for myself
+        votes.add(myId);
+        persistentState.setVotedFor(myId);
+
         long newTerm = persistentState.getCurrentTerm() + 1;
-        persistentState.setCurrentTerm(newTerm);
+        updateTerm(newTerm, "starting an election");
 
         // TODO: is this correct? Or should it be last COMMITTED log entry?
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
@@ -178,6 +189,11 @@ public class Server implements RpcMessageVisitor {
         resetElectionTimeout();
     }
 
+    private void updateTerm(long newTerm, String reason) {
+        persistentState.setCurrentTerm(newTerm);
+        LOG.info("Updating term: {}, reason: {}", newTerm, reason);
+    }
+
     @Override
     public void onAppendEntriesRequest(AppendEntriesRequest aeReq) {
         currentLeaderId = aeReq.getLeaderId();
@@ -188,7 +204,8 @@ public class Server implements RpcMessageVisitor {
         if (currentTerm <= aeReq.getTerm()) {
 
             resetElectionTimeout();
-            currentRole = ServerRole.FOLLOWER; // probably already was, but we may have been a candidate
+            // probably already was a Follower, but may have been a candidate
+            setRole(ServerRole.FOLLOWER, "received AppendEntriesRequest from peer with higher term");
 
             LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
@@ -197,17 +214,21 @@ public class Server implements RpcMessageVisitor {
                 lastLogEntry.getIndex() == aeReq.getPrevLogIndex()) {
 
                 // Success!
-                persistentState.deleteConflictingAndAppend(entries);
+                // only bother touching the persistent state if there are actual new entries, ie not a heartbeat
+                if (!entries.isEmpty()) {
+                    persistentState.deleteConflictingAndAppend(entries);
+                    lastLogEntry = entries.get(entries.size() - 1);
+                }
                 success = true;
-
             }
 
-            if (aeReq.getLeaderCommit() > commitIndex && !entries.isEmpty()) {
-                commitIndex = Math.min(aeReq.getLeaderCommit(), entries.get(entries.size() - 1).getIndex());
+
+            if (aeReq.getLeaderCommit() > commitIndex) {
+                commitIndex = Math.min(aeReq.getLeaderCommit(), lastLogEntry.getIndex());
             }
         }
 
-        AppendEntriesResponse response = new AppendEntriesResponse(aeReq.getRequestId(), currentTerm, success);
+        AppendEntriesResponse response = new AppendEntriesResponse(aeReq.getRequestUid(), currentTerm, success);
         messageDispatcher.sendMessage(currentLeaderId, response);
     }
 
@@ -222,7 +243,7 @@ public class Server implements RpcMessageVisitor {
             return;
         }
 
-        AppendEntriesRequest request = appendEntriesRequests.remove(aeResp.getRequestId());
+        AppendEntriesRequest request = aeResp.getRequest();
         if (request == null) {
 //            throw new IllegalStateException("Could not find AppendEntriesRequest corresponding to response with id " + aeResp.getRequestId());
             return; // Presumably wasn't us who sent this request and we have received the response in error
@@ -239,7 +260,9 @@ public class Server implements RpcMessageVisitor {
                 entries.forEach(entry -> {
                     long index = entry.getIndex();
                     if (index > commitIndex && indicesAwaitingCommit.add(index) >= majoritySize) {
+                        LOG.info("Log index={} has been persisted by the majority and is COMMITTED", index);
                         commitIndex = index;
+                        indicesAwaitingCommit.clear(index); // clean-up - not interested any more
                     }
                 });
             }
@@ -255,20 +278,21 @@ public class Server implements RpcMessageVisitor {
 
         if (rvReq.getTerm() >= currentTerm) {
             int votedFor = persistentState.getVotedFor();
-            // if we haven't voted for someone else already...
+            // if we haven't voted for someone else already this term...
             if ((votedFor == -1 || votedFor == rvReq.getCandidateId())) {
                 // ...and this candidate is at lease as up-to-date as we are
                 LogEntry lastLogEntry = persistentState.getLastLogEntry();
                 if (rvReq.getLastLogTerm() > lastLogEntry.getTerm() ||
                     (rvReq.getLastLogTerm() == lastLogEntry.getTerm() && rvReq.getLastLogIndex() >= lastLogEntry.getIndex())) {
 
+                    LOG.info("Voting for candidate id={}", rvReq.getCandidateId());
                     voteGranted = true;
+                    persistentState.setVotedFor(rvReq.getCandidateId());
                 }
             }
         }
 
-        RequestVoteResponse response = new RequestVoteResponse(myId, currentTerm, voteGranted);
-
+        RequestVoteResponse response = new RequestVoteResponse(rvReq.getRequestUid(), myId, currentTerm, voteGranted);
         messageDispatcher.sendMessage(rvReq.getCandidateId(), response);
     }
 
@@ -287,13 +311,14 @@ public class Server implements RpcMessageVisitor {
     }
 
     private void becomeLeader() {
-        currentRole = ServerRole.LEADER;
+        setRole(ServerRole.LEADER, "won the election");
         currentLeaderId = myId;
-        sendAppendEntriesRequests(true);
 
         // TODO: Again, should this be the last COMMITTED index?
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
         Arrays.fill(nextIndices, lastLogEntry.getIndex() + 1);
+
+        sendAppendEntriesRequests(true);
     }
 
     @Override
@@ -302,16 +327,19 @@ public class Server implements RpcMessageVisitor {
         if (currentRole == ServerRole.LEADER) {
             LogEntry lastEntry = persistentState.getLastLogEntry();
             LogEntry newEntry = new LogEntry(lastEntry.getTerm(), lastEntry.getIndex() + 1, neReq.getData());
+
             persistentState.appendLogEntry(newEntry);
+            indicesAwaitingCommit.add(newEntry.getIndex()); // I, the leader, count as one of the replicas
+            LOG.info("Applied new log entry, index={}", newEntry.getIndex());
 
-
+            response = new NewEntryResponse(neReq.getRequestUid(), neReq.getClient(), -1, true);
         } else {
             // redirect to the leader
-            response = new NewEntryResponse(currentLeaderId, false);
+            LOG.info("Redirected new entry request to current leader, id={}", currentLeaderId);
+            response = new NewEntryResponse(neReq.getRequestUid(), neReq.getClient(), currentLeaderId, false);
         }
 
-        // TODO - some way to respond to the client!
-        // NewEntry probably shouldn't implement RpcMessage
+        messageDispatcher.sendMessage(response);
     }
 
     public int getMyId() {
@@ -334,6 +362,12 @@ public class Server implements RpcMessageVisitor {
                 // Everything from the last-seen to now. If this turns out to be empty this is essentially a heartbeat.
                 persistentState.getLogEntriesBetween(nextIndices[peerIndex], lastLogEntry.getIndex() + 1);
 
+            if (logsToSend.isEmpty()) {
+                LOG.info("Sending heartbeat to peer id={}", recipient);
+            } else {
+                LOG.info("Sending AppendEntriesRequest with {} logs to peer id={}", logsToSend.size(), recipient);
+            }
+
             AppendEntriesRequest request = new AppendEntriesRequest(
                 persistentState.getCurrentTerm(),
                 myId,
@@ -343,17 +377,25 @@ public class Server implements RpcMessageVisitor {
                 logsToSend,
                 commitIndex
             );
-            appendEntriesRequests.put(request.getRequestId(), request);
 
-            messageDispatcher.sendMessage(recipient, request);
+            messageDispatcher.sendMessage(recipient, messageHandler.register(request));
         });
+
+        resetHeartbeat();
     }
 
-    private void sendToAll(RpcMessage message) {
-        peers.forEach(recipient -> messageDispatcher.sendMessage(recipient, message));
+    private void sendToAll(BaseRequest request) {
+        peers.forEach(recipient -> messageDispatcher.sendMessage(recipient, messageHandler.register(request)));
     }
 
     private int getIndexForPeer(Integer peerId) {
         return peers.indexOf(peerId);
+    }
+
+    private void setRole(ServerRole newRole, String reason) {
+        if (currentRole != newRole) {
+            LOG.info("Changing from role {} to role: {}, reason: {}", currentRole, newRole, reason);
+            this.currentRole = newRole;
+        }
     }
 }

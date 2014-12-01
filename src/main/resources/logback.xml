@@ -6,8 +6,16 @@
         </encoder>
     </appender>
 
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>output.log</file>
+        <encoder>
+            <pattern>%date{ISO8601} [%thread] %-5p [%c{0}] - %m%n</pattern>
+        </encoder>
+    </appender>
+
     <root level="INFO">
-        <appender-ref ref="console"/>
+        <!--<appender-ref ref="console"/>-->
+        <appender-ref ref="FILE"/>
     </root>
 
 </configuration>

@@ -26,6 +26,13 @@ public class InMemoryPersistentState implements PersistentState {
 
     @Override
     public void setCurrentTerm(long currentTerm) {
+        // TODO: this logic applies to all PersistentState implementations: refactor into base class?
+        if (currentTerm < this.currentTerm) {
+            throw new IllegalStateException("Cannot decrease current term");
+        }
+        if (currentTerm > this.currentTerm) {
+            this.votedFor = -1;
+        }
         this.currentTerm = currentTerm;
     }
 
@@ -46,12 +53,12 @@ public class InMemoryPersistentState implements PersistentState {
 
     @Override
     public List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex) {
-        return Collections.unmodifiableList(new ArrayList<>(logEntries.subList((int) fromIndex, (int) toIndex)));
+        return Collections.unmodifiableList(new ArrayList<>(logEntries.subList((int) --fromIndex, (int) --toIndex)));
     }
 
     @Override
     public LogEntry getLogEntry(long logIndex) {
-        return logEntries.get((int) logIndex);
+        return logIndex == 0 ? EMPTY_LOG : logEntries.get((int) (logIndex - 1));
     }
 
     @Override
@@ -64,14 +71,16 @@ public class InMemoryPersistentState implements PersistentState {
         int listIndex = -1;
         for (LogEntry entry : entries) {
             listIndex = (int) (entry.getIndex() - 1);
-            if (entries.size() <= listIndex) {
-                entries.add(entry);
+            if (logEntries.size() <= listIndex) {
+                logEntries.add(entry);
             } else {
-                entries.set(listIndex, entry);
+                // Overwrite previous entries
+                logEntries.set(listIndex, entry);
             }
         }
 
-        for (int i = listIndex; i < logEntries.size(); i++) {
+        // Delete all future entries
+        for (int i = listIndex + 1; i < logEntries.size(); i++) {
             logEntries.remove(i);
         }
     }

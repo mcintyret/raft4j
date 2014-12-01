@@ -4,7 +4,7 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class RequestVoteResponse implements RaftRpcMessage {
+public class RequestVoteResponse extends BaseResponse<RequestVoteRequest> implements RaftRpcMessage {
 
     private final int voterId;
 
@@ -12,7 +12,8 @@ public class RequestVoteResponse implements RaftRpcMessage {
 
     private final boolean voteGranted;
 
-    public RequestVoteResponse(int voterId, long term, boolean voteGranted) {
+    public RequestVoteResponse(String uuid, int voterId, long term, boolean voteGranted) {
+        super(uuid);
         this.voterId = voterId;
         this.term = term;
         this.voteGranted = voteGranted;

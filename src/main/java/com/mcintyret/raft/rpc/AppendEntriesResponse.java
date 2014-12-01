@@ -4,16 +4,14 @@ package com.mcintyret.raft.rpc;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesResponse implements RaftRpcMessage {
-
-    private final long requestId;
+public class AppendEntriesResponse extends BaseResponse<AppendEntriesRequest> implements RaftRpcMessage {
 
     private final long term;
 
     private final boolean success;
 
-    public AppendEntriesResponse(long requestId, long term, boolean success) {
-        this.requestId = requestId;
+    public AppendEntriesResponse(String uuid, long term, boolean success) {
+        super(uuid);
         this.term = term;
         this.success = success;
     }
@@ -25,10 +23,6 @@ public class AppendEntriesResponse implements RaftRpcMessage {
 
     public boolean isSuccess() {
         return success;
-    }
-
-    public long getRequestId() {
-        return requestId;
     }
 
     @Override

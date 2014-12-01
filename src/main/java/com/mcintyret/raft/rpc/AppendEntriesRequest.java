@@ -9,11 +9,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class AppendEntriesRequest implements RaftRpcMessage {
-
-    private static final AtomicLong REQUEST_ID_GEN = new AtomicLong();
-
-    private final long requestId = REQUEST_ID_GEN.incrementAndGet();
+public class AppendEntriesRequest extends BaseRequest implements RaftRpcMessage {
 
     private final long term;
 
@@ -37,10 +33,6 @@ public class AppendEntriesRequest implements RaftRpcMessage {
         this.prevLogTerm = prevLogTerm;
         this.entries = entries;
         this.leaderCommit = leaderCommit;
-    }
-
-    public long getRequestId() {
-        return requestId;
     }
 
     public int getTargetId() {
