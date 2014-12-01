@@ -8,4 +8,8 @@ public interface StateMachine {
 
     void apply(long index, byte[] data);
 
+    long getLastApplied();
+
+    void setLastApplied(long lastApplied);
+
 }

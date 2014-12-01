@@ -66,18 +66,6 @@ public class Runner {
         }
     };
 
-    private enum LoggingStateMachine implements StateMachine {
-        INSTANCE;
-
-        @Override
-        public void apply(long index, byte[] data) {
-            LOG.info("Index: {}, data: {}", index, new String(data));
-        }
-
-        private static final Logger LOG = LoggerFactory.getLogger("StateMachine");
-
-    }
-
     public static void main(String[] args) throws IOException, InterruptedException {
 
         for (int i = 0; i < SIZE; i++) {

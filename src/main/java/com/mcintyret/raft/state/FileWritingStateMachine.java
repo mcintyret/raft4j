@@ -10,7 +10,7 @@ import java.nio.file.Paths;
  * User: tommcintyre
  * Date: 12/1/14
  */
-public class FileWritingStateMachine implements StateMachine {
+public class FileWritingStateMachine extends AbstractStateMachine {
 
     private final BufferedWriter writer;
 
