@@ -1,17 +1,18 @@
 package com.mcintyret.raft.rpc;
 
-import java.util.UUID;
+import com.mcintyret.raft.address.Address;
 
 /**
  * User: tommcintyre
  * Date: 11/30/14
  */
-public class BaseRequest implements Message {
+public class BaseRequest extends BaseMessage {
 
-    private final String uuid = UUID.randomUUID().toString();
+    public BaseRequest(Address source, Address destination) {
+        this(new Header(source, destination));
+    }
 
-    @Override
-    public String getRequestUid() {
-        return uuid;
+    public BaseRequest(Header header) {
+        super(header);
     }
 }

@@ -8,15 +8,13 @@ public class RequestVoteRequest extends BaseRequest implements RaftRpcMessage {
 
     private final long term;
 
-    private final int candidateId;
-
     private final long lastLogIndex;
 
     private final long lastLogTerm;
 
-    public RequestVoteRequest(long term, int candidateId, long lastLogIndex, long lastLogTerm) {
+    public RequestVoteRequest(Header header, long term, long lastLogIndex, long lastLogTerm) {
+        super(header);
         this.term = term;
-        this.candidateId = candidateId;
         this.lastLogIndex = lastLogIndex;
         this.lastLogTerm = lastLogTerm;
     }
@@ -24,10 +22,6 @@ public class RequestVoteRequest extends BaseRequest implements RaftRpcMessage {
     @Override
     public long getTerm() {
         return term;
-    }
-
-    public int getCandidateId() {
-        return candidateId;
     }
 
     public long getLastLogIndex() {

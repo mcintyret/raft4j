@@ -1,5 +1,25 @@
 package com.mcintyret.raft;
 
+import com.mcintyret.raft.address.Address;
+import com.mcintyret.raft.address.Client;
+import com.mcintyret.raft.address.Peer;
+import com.mcintyret.raft.core.Server;
+import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
+import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
+import com.mcintyret.raft.message.MessageDispatcher;
+import com.mcintyret.raft.message.MessageHandler;
+import com.mcintyret.raft.persist.InMemoryPersistentState;
+import com.mcintyret.raft.persist.PersistentState;
+import com.mcintyret.raft.rpc.Header;
+import com.mcintyret.raft.rpc.Message;
+import com.mcintyret.raft.rpc.NewEntryRequest;
+import com.mcintyret.raft.rpc.NewEntryResponse;
+import com.mcintyret.raft.rpc.RpcMessage;
+import com.mcintyret.raft.state.FileWritingStateMachine;
+import com.mcintyret.raft.state.StateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -13,25 +33,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.mcintyret.raft.client.Client;
-import com.mcintyret.raft.client.ClientMessage;
-import com.mcintyret.raft.core.Server;
-import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
-import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
-import com.mcintyret.raft.message.MessageDispatcher;
-import com.mcintyret.raft.message.MessageHandler;
-import com.mcintyret.raft.persist.InMemoryPersistentState;
-import com.mcintyret.raft.persist.PersistentState;
-import com.mcintyret.raft.rpc.Message;
-import com.mcintyret.raft.rpc.NewEntryRequest;
-import com.mcintyret.raft.rpc.NewEntryResponse;
-import com.mcintyret.raft.rpc.RpcMessage;
-import com.mcintyret.raft.state.FileWritingStateMachine;
-import com.mcintyret.raft.state.StateMachine;
-
 /**
  * User: tommcintyre
  * Date: 11/29/14
@@ -42,27 +43,28 @@ public class Runner {
 
     private static final ElectionTimeoutGenerator ELECTION_TIMEOUT_GENERATOR = new RandomElectionTimeoutGenerator(5000L, 6000L);
 
-    private static final Map<Integer, Server> SERVERS = new ConcurrentHashMap<>(SIZE);
+    private static final Map<Peer, Server> SERVERS = new ConcurrentHashMap<>(SIZE);
 
-    private static final BlockingQueue<ClientMessage> CLIENT_MESSAGES = new LinkedBlockingQueue<>();
+    private static final BlockingQueue<Message> CLIENT_MESSAGES = new LinkedBlockingQueue<>();
 
-    private static final Set<Integer> UNREACHABLE_CLIENTS = new CopyOnWriteArraySet<>();
+    private static final Set<Peer> UNREACHABLE_PEERS = new CopyOnWriteArraySet<>();
 
     private static final List<ServerController> SERVER_CONTROLLERS = new ArrayList<>(SIZE);
 
     private static final MessageDispatcher MESSAGE_DISPATCHER = new MessageDispatcher() {
 
         @Override
-        public void sendMessage(int recipientId, Message message) {
+        public void sendMessage(Message message) {
             Server server;
-            if (!UNREACHABLE_CLIENTS.contains(recipientId) && (server = SERVERS.get(recipientId)) != null) {
-                server.messageReceived((RpcMessage) message);
-            }
-        }
 
-        @Override
-        public void sendMessage(ClientMessage message) {
-            CLIENT_MESSAGES.add(message);
+            Address destination = message.getHeader().getDestination();
+            if (destination instanceof Client) {
+                CLIENT_MESSAGES.add(message);
+            } else {
+                if (!UNREACHABLE_PEERS.contains(destination) && (server = SERVERS.get(destination)) != null) {
+                    server.messageReceived((RpcMessage) message);
+                }
+            }
         }
     };
 
@@ -88,17 +90,17 @@ public class Runner {
 
         private final MessageHandler messageHandler = new MessageHandler();
 
-        private final BlockingQueue<ClientMessage> clientMessages;
+        private final BlockingQueue<Message> clientMessages;
 
         private ConsoleClient(MessageDispatcher messageDispatcher,
-                              BlockingQueue<ClientMessage> clientMessages) {
+                              BlockingQueue<Message> clientMessages) {
             this.messageDispatcher = messageDispatcher;
             this.clientMessages = clientMessages;
         }
 
         public void run() throws IOException, InterruptedException {
             while (true) {
-                ClientMessage message = clientMessages.poll(100, TimeUnit.MILLISECONDS);
+                Message message = clientMessages.poll(100, TimeUnit.MILLISECONDS);
 
                 if (message != null) {
                     handleResponse(messageHandler.decorate((NewEntryResponse) message));
@@ -113,7 +115,7 @@ public class Runner {
 
                         switch (command) {
                             case "send":
-                                sendBytes(id, parts[2].getBytes());
+                                sendBytes(new IntegerPeer(id), parts[2].getBytes());
                                 break;
                             case "start":
                                 SERVER_CONTROLLERS.get(id).start();
@@ -142,23 +144,23 @@ public class Runner {
 
         private static void usage() {
             String usage = "send: <id>: <message>\n" +
-                           "start: <id>\n" +
-                           "stop: <id>\n" +
-                           "mute: <id>\n" +
-                           "unmute: <id>";
+                "start: <id>\n" +
+                "stop: <id>\n" +
+                "mute: <id>\n" +
+                "unmute: <id>";
             System.err.println(usage);
         }
 
         private void handleResponse(NewEntryResponse message) {
-            if (message.isKnownSuccess()) {
-                LOG.info("Success for message " + message.getRequestUid());
+            if (message.getRedirect() == null) {
+                LOG.info("Success for message " + message.getHeader().getRuuid());
             } else {
                 sendBytes(message.getRedirect(), message.getRequest().getData());
             }
         }
 
-        private void sendBytes(Integer serverId, byte[] bytes) {
-            messageDispatcher.sendMessage(serverId, messageHandler.register(new NewEntryRequest(this, bytes)));
+        private void sendBytes(Peer peer, byte[] bytes) {
+            messageDispatcher.sendMessage(messageHandler.register(new NewEntryRequest(new Header(this, peer), bytes)));
         }
     }
 
@@ -187,11 +189,11 @@ public class Runner {
         return ret;
     }
 
-    private static List<Integer> makePeersList(int id) {
-        List<Integer> peers = new ArrayList<>(SIZE - 1);
+    private static List<Peer> makePeersList(IntegerPeer me) {
+        List<Peer> peers = new ArrayList<>(SIZE - 1);
         for (int i = 0; i < SIZE; i++) {
-            if (i != id) {
-                peers.add(i);
+            if (i != me.getId()) {
+                peers.add(new IntegerPeer(i));
             }
         }
         return Collections.unmodifiableList(peers);
@@ -199,9 +201,9 @@ public class Runner {
 
     private static class ServerController {
 
-        private final int id;
+        private final IntegerPeer peer;
 
-        private final List<Integer> peers;
+        private final List<Peer> peers;
 
         // Survives across incarnations, by definition
         private final PersistentState persistentState = new InMemoryPersistentState();
@@ -209,10 +211,10 @@ public class Runner {
         // TODO: think about whether this should survive across incarnations?
         private final StateMachine stateMachine;
 
-        private ServerController(int id) {
-            this.id = id;
-            this.peers = makePeersList(id);
-            this.stateMachine = new FileWritingStateMachine("logs/" + id + ".log");
+        private ServerController(int i) {
+            this.peer = new IntegerPeer(i);
+            this.peers = makePeersList(peer);
+            this.stateMachine = new FileWritingStateMachine("logs/" + peer + ".log");
         }
 
         private Server server;
@@ -224,11 +226,11 @@ public class Runner {
                 throw new IllegalStateException("Server already running, cannot call start");
             }
 
-            server = new Server(id, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, MESSAGE_DISPATCHER, stateMachine);
-            thread = new Thread(server::run, "Server: " + id);
+            server = new Server(peer, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, MESSAGE_DISPATCHER, stateMachine);
+            thread = new Thread(server::run, "Server: " + peer);
 
-            if (SERVERS.put(id, server) != null) {
-                throw new IllegalStateException("Existing value found for server id " + id + " when should be empty");
+            if (SERVERS.put(peer, server) != null) {
+                throw new IllegalStateException("Existing value found for server id " + peer + " when should be empty");
             }
             thread.start();
         }
@@ -244,17 +246,17 @@ public class Runner {
             } catch (InterruptedException e) {
                 throw new AssertionError(e);
             }
-            SERVERS.remove(id);
+            SERVERS.remove(peer);
             thread = null;
             server = null;
         }
 
         public void makeUnreachable() {
-            UNREACHABLE_CLIENTS.add(id);
+            UNREACHABLE_PEERS.add(peer);
         }
 
         public void makeReachable() {
-            UNREACHABLE_CLIENTS.remove(id);
+            UNREACHABLE_PEERS.remove(peer);
         }
     }
 
@@ -266,5 +268,39 @@ public class Runner {
 //            }
 //        }
 //    }
+
+    private static final class IntegerPeer implements Peer {
+        private final int id;
+
+        private IntegerPeer(int id) {
+            this.id = id;
+        }
+
+        private int getId() {
+            return id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            IntegerPeer that = (IntegerPeer) o;
+
+            if (id != that.id) return false;
+
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return id;
+        }
+
+        @Override
+        public String toString() {
+            return Integer.toString(id);
+        }
+    }
 
 }

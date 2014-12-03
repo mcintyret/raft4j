@@ -1,5 +1,6 @@
 package com.mcintyret.raft.persist;
 
+import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.core.LogEntry;
 
 import java.util.List;
@@ -16,10 +17,10 @@ public interface PersistentState {
 
     void setCurrentTerm(long currentTerm);
 
-    // -1 if none
-    int getVotedFor();
+    // null if none
+    Peer getVotedFor();
 
-    void setVotedFor(int votedFor);
+    void setVotedFor(Peer votedFor);
 
     List<LogEntry> getAllLogEntries();
 

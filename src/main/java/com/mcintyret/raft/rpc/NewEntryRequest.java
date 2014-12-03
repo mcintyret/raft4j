@@ -1,22 +1,17 @@
 package com.mcintyret.raft.rpc;
 
-import com.mcintyret.raft.client.Client;
-import com.mcintyret.raft.client.ClientMessage;
-
 /**
  * User: tommcintyre
  * Date: 11/29/14
  */
 
 // Unlike the other message types, this comes from clients of the Raft cluster, not other members
-public class NewEntryRequest extends BaseRequest implements RpcMessage, ClientMessage {
-
-    private final Client client;
+public class NewEntryRequest extends BaseRequest implements RpcMessage {
 
     private final byte[] data;
 
-    public NewEntryRequest(Client client, byte[] data) {
-        this.client = client;
+    public NewEntryRequest(Header header, byte[] data) {
+        super(header);
         this.data = data;
     }
 
@@ -29,8 +24,4 @@ public class NewEntryRequest extends BaseRequest implements RpcMessage, ClientMe
         visitor.onNewEntryRequest(this);
     }
 
-    @Override
-    public Client getClient() {
-        return client;
-    }
 }

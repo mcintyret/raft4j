@@ -6,21 +6,14 @@ package com.mcintyret.raft.rpc;
  */
 public class RequestVoteResponse extends BaseResponse<RequestVoteRequest> implements RaftRpcMessage {
 
-    private final int voterId;
-
     private final long term;
 
     private final boolean voteGranted;
 
-    public RequestVoteResponse(String uuid, int voterId, long term, boolean voteGranted) {
-        super(uuid);
-        this.voterId = voterId;
+    public RequestVoteResponse(Header header, long term, boolean voteGranted) {
+        super(header);
         this.term = term;
         this.voteGranted = voteGranted;
-    }
-
-    public int getVoterId() {
-        return voterId;
     }
 
     @Override

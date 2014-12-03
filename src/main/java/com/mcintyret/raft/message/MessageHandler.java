@@ -17,12 +17,12 @@ public class MessageHandler {
     private final Map<String, BaseRequest> map = new HashMap<>();
 
     public <T extends BaseRequest> T register(T message) {
-        map.put(message.getRequestUid(), message);
+        map.put(message.getHeader().getRuuid(), message);
         return message;
     }
 
     public <U extends BaseResponse<T>, T extends BaseRequest> U decorate(U response) {
-        T request = (T) map.remove(response.getRequestUid()); // TODO: what if it's null?
+        T request = (T) map.remove(response.getHeader().getRuuid()); // TODO: what if it's null?
         response.setRequest(request);
         return response;
     }

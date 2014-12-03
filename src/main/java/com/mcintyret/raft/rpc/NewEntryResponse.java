@@ -1,7 +1,6 @@
 package com.mcintyret.raft.rpc;
 
-import com.mcintyret.raft.client.Client;
-import com.mcintyret.raft.client.ClientMessage;
+import com.mcintyret.raft.address.Peer;
 
 /**
  * User: tommcintyre
@@ -9,31 +8,17 @@ import com.mcintyret.raft.client.ClientMessage;
  */
 
 // Unlike other messages this is only sent to the client.
-public class NewEntryResponse extends BaseResponse<NewEntryRequest> implements ClientMessage {
+public class NewEntryResponse extends BaseResponse<NewEntryRequest> {
 
-    private final int redirect;
+    private final Peer redirect;
 
-    private final boolean knownSuccess;
-
-    private final Client client;
-
-    public NewEntryResponse(String uuid, Client client, int redirect, boolean knownSuccess) {
-        super(uuid);
-        this.client = client;
+    public NewEntryResponse(Header header, Peer redirect) {
+        super(header);
         this.redirect = redirect;
-        this.knownSuccess = knownSuccess;
     }
 
-    public int getRedirect() {
+    public Peer getRedirect() {
         return redirect;
     }
 
-    public boolean isKnownSuccess() {
-        return knownSuccess;
-    }
-
-    @Override
-    public Client getClient() {
-        return client;
-    }
 }

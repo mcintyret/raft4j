@@ -12,10 +12,6 @@ public class AppendEntriesRequest extends BaseRequest implements RaftRpcMessage 
 
     private final long term;
 
-    private final int leaderId;
-
-    private final int targetId;
-
     private final long prevLogIndex;
 
     private final long prevLogTerm;
@@ -24,27 +20,18 @@ public class AppendEntriesRequest extends BaseRequest implements RaftRpcMessage 
 
     private final long leaderCommit;
 
-    public AppendEntriesRequest(long term, int leaderId, int targetId, long prevLogIndex, long prevLogTerm, List<LogEntry> entries, long leaderCommit) {
+    public AppendEntriesRequest(Header header, long term, long prevLogIndex, long prevLogTerm, List<LogEntry> entries, long leaderCommit) {
+        super(header);
         this.term = term;
-        this.leaderId = leaderId;
-        this.targetId = targetId;
         this.prevLogIndex = prevLogIndex;
         this.prevLogTerm = prevLogTerm;
         this.entries = entries;
         this.leaderCommit = leaderCommit;
     }
 
-    public int getTargetId() {
-        return targetId;
-    }
-
     @Override
     public long getTerm() {
         return term;
-    }
-
-    public int getLeaderId() {
-        return leaderId;
     }
 
     public long getPrevLogIndex() {

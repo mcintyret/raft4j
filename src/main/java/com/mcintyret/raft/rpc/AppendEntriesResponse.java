@@ -10,8 +10,8 @@ public class AppendEntriesResponse extends BaseResponse<AppendEntriesRequest> im
 
     private final boolean success;
 
-    public AppendEntriesResponse(String uuid, long term, boolean success) {
-        super(uuid);
+    public AppendEntriesResponse(Header header, long term, boolean success) {
+        super(header);
         this.term = term;
         this.success = success;
     }

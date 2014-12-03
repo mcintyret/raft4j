@@ -6,5 +6,6 @@ package com.mcintyret.raft.rpc;
  */
 public interface Message {
 
-    String getRequestUid();
+    Header getHeader();
+
 }

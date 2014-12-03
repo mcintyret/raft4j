@@ -1,5 +1,6 @@
 package com.mcintyret.raft.persist;
 
+import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.core.LogEntry;
 
 import java.util.ArrayList;
@@ -17,7 +18,7 @@ public class InMemoryPersistentState implements PersistentState {
 
     private final List<LogEntry> logEntries = new ArrayList<>();
 
-    private int votedFor = -1;
+    private Peer votedFor = null;
 
     @Override
     public long getCurrentTerm() {
@@ -31,18 +32,18 @@ public class InMemoryPersistentState implements PersistentState {
             throw new IllegalStateException("Cannot decrease current term");
         }
         if (currentTerm > this.currentTerm) {
-            this.votedFor = -1;
+            this.votedFor = null;
         }
         this.currentTerm = currentTerm;
     }
 
     @Override
-    public int getVotedFor() {
+    public Peer getVotedFor() {
         return votedFor;
     }
 
     @Override
-    public void setVotedFor(int votedFor) {
+    public void setVotedFor(Peer votedFor) {
         this.votedFor = votedFor;
     }
 

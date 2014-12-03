@@ -1,6 +1,5 @@
 package com.mcintyret.raft.message;
 
-import com.mcintyret.raft.client.ClientMessage;
 import com.mcintyret.raft.rpc.Message;
 
 /**
@@ -9,10 +8,6 @@ import com.mcintyret.raft.rpc.Message;
  */
 public interface MessageDispatcher {
 
-    // Todo: handle exceptions?
-    // TODO: retry indefinitely (this is a key part of raft!)
-    void sendMessage(int recipientId, Message message);
-
-    void sendMessage(ClientMessage message);
+    void sendMessage(Message message);
 
 }
