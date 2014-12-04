@@ -5,7 +5,7 @@ import java.util.List;
 import com.mcintyret.raft.core.LogEntry;
 import com.mcintyret.raft.util.Utils;
 
-public abstract class AbstractStateMachine implements StateMachine {
+public abstract class BaseStateMachine implements StateMachine {
 
     private final SnapshotStrategy snapshotStrategy;
 
@@ -15,7 +15,7 @@ public abstract class AbstractStateMachine implements StateMachine {
 
     private long lastApplied = -1;
 
-    public AbstractStateMachine(SnapshotStrategy snapshotStrategy) {
+    public BaseStateMachine(SnapshotStrategy snapshotStrategy) {
         this.snapshotStrategy = snapshotStrategy;
     }
 

@@ -12,7 +12,7 @@ import com.mcintyret.raft.core.LogEntry;
  * User: tommcintyre
  * Date: 12/1/14
  */
-public class FileWritingStateMachine extends AbstractStateMachine {
+public class FileWritingStateMachine extends BaseStateMachine {
 
     private final BufferedWriter writer;
 
