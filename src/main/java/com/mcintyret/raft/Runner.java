@@ -6,10 +6,15 @@ import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.core.Server;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
+import com.mcintyret.raft.message.BaseRetryingMessageDispatcher;
+import com.mcintyret.raft.message.DecoratingMessageReceiver;
 import com.mcintyret.raft.message.MessageDispatcher;
-import com.mcintyret.raft.message.MessageHandler;
+import com.mcintyret.raft.message.MessageReceiver;
+import com.mcintyret.raft.message.Messages;
 import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.persist.PersistentState;
+import com.mcintyret.raft.rpc.BaseRequest;
+import com.mcintyret.raft.rpc.BaseResponse;
 import com.mcintyret.raft.rpc.Header;
 import com.mcintyret.raft.rpc.Message;
 import com.mcintyret.raft.rpc.NewEntryRequest;
@@ -43,30 +48,12 @@ public class Runner {
 
     private static final ElectionTimeoutGenerator ELECTION_TIMEOUT_GENERATOR = new RandomElectionTimeoutGenerator(5000L, 6000L);
 
-    private static final Map<Peer, Server> SERVERS = new ConcurrentHashMap<>(SIZE);
-
-    private static final BlockingQueue<Message> CLIENT_MESSAGES = new LinkedBlockingQueue<>();
+    private static final Map<Peer, ServerController> SERVERS = new ConcurrentHashMap<>(SIZE);
 
     private static final Set<Peer> UNREACHABLE_PEERS = new CopyOnWriteArraySet<>();
 
     private static final List<ServerController> SERVER_CONTROLLERS = new ArrayList<>(SIZE);
 
-    private static final MessageDispatcher MESSAGE_DISPATCHER = new MessageDispatcher() {
-
-        @Override
-        public void sendMessage(Message message) {
-            Server server;
-
-            Address destination = message.getHeader().getDestination();
-            if (destination instanceof Client) {
-                CLIENT_MESSAGES.add(message);
-            } else {
-                if (!UNREACHABLE_PEERS.contains(destination) && (server = SERVERS.get(destination)) != null) {
-                    server.messageReceived((RpcMessage) message);
-                }
-            }
-        }
-    };
 
     public static void main(String[] args) throws IOException, InterruptedException {
 
@@ -77,25 +64,25 @@ public class Runner {
         // Start them all!
         SERVER_CONTROLLERS.forEach(ServerController::start);
 
-        ConsoleClient client = new ConsoleClient(MESSAGE_DISPATCHER, CLIENT_MESSAGES);
+        ConsoleClient client = new ConsoleClient();
         client.run();
 
     }
 
-    private static class ConsoleClient implements Client {
+    private static class ConsoleClient implements Client, MessageReceiver<Message> {
 
         private static final Logger LOG = LoggerFactory.getLogger("Client");
 
         private final MessageDispatcher messageDispatcher;
 
-        private final MessageHandler messageHandler = new MessageHandler();
+        private final BlockingQueue<Message> clientMessages = new LinkedBlockingQueue<>();
 
-        private final BlockingQueue<Message> clientMessages;
+        private final MessageReceiver<Message> messageReceiver;
 
-        private ConsoleClient(MessageDispatcher messageDispatcher,
-                              BlockingQueue<Message> clientMessages) {
-            this.messageDispatcher = messageDispatcher;
-            this.clientMessages = clientMessages;
+        private ConsoleClient() {
+            Messages messages = new Messages();
+            this.messageDispatcher = new RetryingMessageDispatcherImpl(messages);
+            this.messageReceiver = new DecoratingMessageReceiver<>(messages, this);
         }
 
         public void run() throws IOException, InterruptedException {
@@ -103,7 +90,7 @@ public class Runner {
                 Message message = clientMessages.poll(100, TimeUnit.MILLISECONDS);
 
                 if (message != null) {
-                    handleResponse(messageHandler.decorate((NewEntryResponse) message));
+                    handleResponse((NewEntryResponse) message);
                 }
 
                 String input = readInputStreamWithTimeout(System.in, 100);
@@ -160,7 +147,17 @@ public class Runner {
         }
 
         private void sendBytes(Peer peer, byte[] bytes) {
-            messageDispatcher.sendMessage(messageHandler.register(new NewEntryRequest(new Header(this, peer), bytes)));
+            messageDispatcher.sendRequest(new NewEntryRequest(new Header(this, peer), bytes));
+        }
+
+        @Override
+        public void messageReceived(Message message) {
+            clientMessages.add(message);
+        }
+
+        @Override
+        public String toString() {
+            return "ConsoleClient";
         }
     }
 
@@ -221,15 +218,20 @@ public class Runner {
 
         private Thread thread;
 
+        private MessageReceiver<RpcMessage> messageReceiver;
+
         public void start() {
             if (server != null) {
                 throw new IllegalStateException("Server already running, cannot call start");
             }
 
-            server = new Server(peer, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, MESSAGE_DISPATCHER, stateMachine);
+            Messages messages = new Messages();
+
+            server = new Server(peer, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, new RetryingMessageDispatcherImpl(messages), stateMachine);
+            messageReceiver = new DecoratingMessageReceiver<>(messages, server);
             thread = new Thread(server::run, "Server: " + peer);
 
-            if (SERVERS.put(peer, server) != null) {
+            if (SERVERS.put(peer, this) != null) {
                 throw new IllegalStateException("Existing value found for server id " + peer + " when should be empty");
             }
             thread.start();
@@ -240,6 +242,7 @@ public class Runner {
                 throw new IllegalStateException("Server already stopped, cannot call stop");
             }
 
+            messageReceiver = null;
             thread.interrupt();
             try {
                 thread.join();
@@ -268,6 +271,36 @@ public class Runner {
 //            }
 //        }
 //    }
+
+    private static class RetryingMessageDispatcherImpl extends BaseRetryingMessageDispatcher {
+
+        public RetryingMessageDispatcherImpl(Messages messages) {
+            super(messages);
+        }
+
+        @Override
+        protected void sendRequestInternal(BaseRequest message) {
+            sendMessage(message);
+        }
+
+        private void sendMessage(Message message) {
+            ServerController serverController;
+
+            Address destination = message.getHeader().getDestination();
+            if (destination instanceof ConsoleClient) {
+                ((ConsoleClient) destination).messageReceiver.messageReceived(message);
+            }
+
+            if (!UNREACHABLE_PEERS.contains(destination) && (serverController = SERVERS.get(destination)) != null) {
+                serverController.messageReceiver.messageReceived((RpcMessage) message);
+            }
+        }
+
+        @Override
+        public void sendResponse(BaseResponse response) {
+            sendMessage(response);
+        }
+    }
 
     private static final class IntegerPeer implements Peer {
         private final int id;

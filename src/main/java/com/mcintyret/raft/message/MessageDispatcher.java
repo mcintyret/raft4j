@@ -1,13 +1,16 @@
 package com.mcintyret.raft.message;
 
-import com.mcintyret.raft.rpc.Message;
+import com.mcintyret.raft.rpc.BaseRequest;
+import com.mcintyret.raft.rpc.BaseResponse;
 
 /**
  * User: tommcintyre
  * Date: 11/29/14
  */
-public interface MessageDispatcher {
+public interface MessageDispatcher extends AutoCloseable {
 
-    void sendMessage(Message message);
+    void sendRequest(BaseRequest request);
+
+    void sendResponse(BaseResponse response);
 
 }

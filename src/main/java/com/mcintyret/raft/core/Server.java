@@ -3,12 +3,11 @@ package com.mcintyret.raft.core;
 import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
-import com.mcintyret.raft.message.MessageHandler;
+import com.mcintyret.raft.message.MessageReceiver;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.AppendEntriesRequest;
 import com.mcintyret.raft.rpc.AppendEntriesResponse;
 import com.mcintyret.raft.rpc.BaseRequest;
-import com.mcintyret.raft.rpc.BaseResponse;
 import com.mcintyret.raft.rpc.Header;
 import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.NewEntryResponse;
@@ -36,7 +35,7 @@ import java.util.function.Function;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class Server implements RpcMessageVisitor {
+public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
@@ -55,8 +54,6 @@ public class Server implements RpcMessageVisitor {
     private final PersistentState persistentState;
 
     private final ElectionTimeoutGenerator electionTimeoutGenerator;
-
-    private final MessageDispatcher messageDispatcher;
 
     private final StateMachine stateMachine;
 
@@ -81,7 +78,7 @@ public class Server implements RpcMessageVisitor {
     // leader only
     private final long[] nextIndices;
 
-    private final MessageHandler messageHandler = new MessageHandler();
+    private final MessageDispatcher messageDispatcher;
 
     public Server(Peer me, List<Peer> peers,
                   PersistentState persistentState,
@@ -97,8 +94,8 @@ public class Server implements RpcMessageVisitor {
         this.peers = peers;
         this.persistentState = persistentState;
         this.electionTimeoutGenerator = electionTimeoutGenerator;
-        this.messageDispatcher = messageDispatcher;
         this.stateMachine = stateMachine;
+        this.messageDispatcher = messageDispatcher;
 
         resetElectionTimeout();
         majoritySize = 1 + (peers.size() / 2);
@@ -109,6 +106,7 @@ public class Server implements RpcMessageVisitor {
         this.nextHeartbeat = System.currentTimeMillis() + HEARTBEAT_TIMEOUT;
     }
 
+    @Override
     public void messageReceived(RpcMessage message) {
         messageQueue.add(message);
     }
@@ -130,9 +128,6 @@ public class Server implements RpcMessageVisitor {
             if (message != null) {
                 if (message instanceof RaftRpcMessage) {
                     checkTerm((RaftRpcMessage) message);
-                }
-                if (message instanceof BaseResponse) {
-                    messageHandler.decorate((BaseResponse) message);
                 }
                 message.visit(this);
 
@@ -232,7 +227,7 @@ public class Server implements RpcMessageVisitor {
         }
 
         AppendEntriesResponse response = new AppendEntriesResponse(headerFor(aeReq), currentTerm, success);
-        messageDispatcher.sendMessage(response);
+        messageDispatcher.sendResponse(response);
     }
 
     private void resetElectionTimeout() {
@@ -297,7 +292,7 @@ public class Server implements RpcMessageVisitor {
         }
 
         RequestVoteResponse response = new RequestVoteResponse(headerFor(rvReq), currentTerm, voteGranted);
-        messageDispatcher.sendMessage(response);
+        messageDispatcher.sendResponse(response);
     }
 
 
@@ -346,7 +341,7 @@ public class Server implements RpcMessageVisitor {
         }
         response = new NewEntryResponse(header, redirect);
 
-        messageDispatcher.sendMessage(response);
+        messageDispatcher.sendResponse(response);
     }
 
     public Peer getMe() {
@@ -396,14 +391,14 @@ public class Server implements RpcMessageVisitor {
                 commitIndex
             );
 
-            messageDispatcher.sendMessage(messageHandler.register(request));
+            messageDispatcher.sendRequest(request);
         });
 
         resetHeartbeat();
     }
 
     private void sendToAll(Function<Peer, BaseRequest> func) {
-        peers.forEach(recipient -> messageDispatcher.sendMessage(messageHandler.register(func.apply(recipient))));
+        peers.forEach(recipient -> messageDispatcher.sendRequest(func.apply(recipient)));
     }
 
     private int getIndexForPeer(Peer peer) {
@@ -423,5 +418,10 @@ public class Server implements RpcMessageVisitor {
 
     private Header headerFor(BaseRequest request) {
         return new Header(me, request.getHeader().getSource(), request.getHeader().getRuuid());
+    }
+
+    @Override
+    public void close() throws Exception {
+        messageDispatcher.close();
     }
 }
