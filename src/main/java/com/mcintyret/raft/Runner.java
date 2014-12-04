@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.mcintyret.raft.address.Address;
+import com.mcintyret.raft.address.Addressable;
 import com.mcintyret.raft.address.Client;
 import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.core.Server;
@@ -31,7 +32,6 @@ import com.mcintyret.raft.persist.InMemoryPersistentState;
 import com.mcintyret.raft.persist.PersistentState;
 import com.mcintyret.raft.rpc.BaseRequest;
 import com.mcintyret.raft.rpc.BaseResponse;
-import com.mcintyret.raft.rpc.Header;
 import com.mcintyret.raft.rpc.Message;
 import com.mcintyret.raft.rpc.NewEntryRequest;
 import com.mcintyret.raft.rpc.NewEntryResponse;
@@ -70,7 +70,7 @@ public class Runner {
 
     }
 
-    private static class ConsoleClient implements Client, MessageReceiver<Message> {
+    private static class ConsoleClient implements Client, MessageReceiver<Message>, Addressable {
 
         private static final Logger LOG = LoggerFactory.getLogger("Client");
 
@@ -148,7 +148,7 @@ public class Runner {
         }
 
         private void sendBytes(Peer peer, byte[] bytes) {
-            messageDispatcher.sendRequest(new NewEntryRequest(new Header(this, peer), bytes));
+            messageDispatcher.sendRequest(new NewEntryRequest(headerFor(peer), bytes));
         }
 
         @Override
@@ -159,6 +159,11 @@ public class Runner {
         @Override
         public String toString() {
             return "ConsoleClient";
+        }
+
+        @Override
+        public Address getAddress() {
+            return this;
         }
     }
 

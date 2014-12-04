@@ -13,6 +13,8 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.mcintyret.raft.address.Address;
+import com.mcintyret.raft.address.Addressable;
 import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
@@ -37,7 +39,7 @@ import com.mcintyret.raft.util.Multiset;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
+public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, Addressable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
@@ -418,11 +420,8 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
         }
     }
 
-    private Header headerFor(Peer recipient) {
-        return new Header(me, recipient);
-    }
-
-    private Header headerFor(BaseRequest request) {
-        return new Header(me, request.getHeader().getSource(), request.getHeader().getRuuid());
+    @Override
+    public Address getAddress() {
+        return me;
     }
 }
