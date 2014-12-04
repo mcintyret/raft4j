@@ -7,7 +7,7 @@ import com.mcintyret.raft.rpc.BaseResponse;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public interface MessageDispatcher extends AutoCloseable {
+public interface MessageDispatcher {
 
     void sendRequest(BaseRequest request);
 

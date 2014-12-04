@@ -1,5 +1,18 @@
 package com.mcintyret.raft.core;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
@@ -18,24 +31,12 @@ import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
 import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, AutoCloseable {
+public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
 
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
@@ -418,10 +419,5 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
     private Header headerFor(BaseRequest request) {
         return new Header(me, request.getHeader().getSource(), request.getHeader().getRuuid());
-    }
-
-    @Override
-    public void close() throws Exception {
-        messageDispatcher.close();
     }
 }
