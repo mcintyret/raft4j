@@ -145,12 +145,10 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
     }
 
     private void updateStateMachine() {
-        long lastApplied = stateMachine.getLastApplied();
-        if (commitIndex > lastApplied) {
-            List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastApplied + 1, commitIndex + 1);
-            toApply.forEach(entry -> stateMachine.apply(entry.getIndex(), entry.getData()));
-
-            stateMachine.setLastApplied(commitIndex);
+        long lastAppliedIndex = stateMachine.getLastAppliedIndex();
+        if (commitIndex > lastAppliedIndex) {
+            List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastAppliedIndex + 1, commitIndex + 1);
+            stateMachine.applyAll(toApply);
         }
     }
 

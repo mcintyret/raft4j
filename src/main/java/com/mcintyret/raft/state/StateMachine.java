@@ -1,15 +1,21 @@
 package com.mcintyret.raft.state;
 
+import java.util.List;
+
+import com.mcintyret.raft.core.LogEntry;
+
 /**
  * User: tommcintyre
  * Date: 11/30/14
  */
 public interface StateMachine {
 
-    void apply(long index, byte[] data);
+    void apply(LogEntry entry);
 
-    long getLastApplied();
+    void applyAll(List<LogEntry> entries);
 
-    void setLastApplied(long lastApplied);
+    long getLastAppliedIndex();
+
+    Snapshot getLatestSnapshot();
 
 }

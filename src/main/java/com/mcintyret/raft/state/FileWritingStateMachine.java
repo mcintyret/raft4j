@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import com.mcintyret.raft.core.LogEntry;
+
 /**
  * User: tommcintyre
  * Date: 12/1/14
@@ -15,6 +17,7 @@ public class FileWritingStateMachine extends AbstractStateMachine {
     private final BufferedWriter writer;
 
     public FileWritingStateMachine(String fileName) {
+        super(new LogCountingSnapshotStrategy(5));
         try {
             Path path = Paths.get(fileName);
             if (!Files.exists(path)) {
@@ -31,9 +34,14 @@ public class FileWritingStateMachine extends AbstractStateMachine {
     }
 
     @Override
-    public void apply(long index, byte[] data) {
+    protected Snapshot takeSnapshot() {
+        return null; // TODO: implement
+    }
+
+    @Override
+    protected void applyInternal(LogEntry entry) {
         try {
-            writer.write(index + ": " + new String(data));
+            writer.write(entry.getTerm() + ": " + entry.getIndex() + ": " + new String(entry.getData()));
             writer.newLine();
             writer.flush();
         } catch (IOException e) {

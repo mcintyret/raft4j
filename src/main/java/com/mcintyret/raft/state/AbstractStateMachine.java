@@ -1,11 +1,22 @@
 package com.mcintyret.raft.state;
 
+import java.util.List;
+
+import com.mcintyret.raft.core.LogEntry;
+import com.mcintyret.raft.util.Utils;
+
 public abstract class AbstractStateMachine implements StateMachine {
 
-    private long lastApplied;
+    private final SnapshotStrategy snapshotStrategy;
 
-    public AbstractStateMachine() {
-        this.lastApplied = getInitialLastApplied();
+    private long bytesSinceSnapshot;
+
+    private Snapshot lastSnapshot;
+
+    private long lastApplied = -1;
+
+    public AbstractStateMachine(SnapshotStrategy snapshotStrategy) {
+        this.snapshotStrategy = snapshotStrategy;
     }
 
     protected long getInitialLastApplied() {
@@ -14,12 +25,49 @@ public abstract class AbstractStateMachine implements StateMachine {
     }
 
     @Override
-    public long getLastApplied() {
+    public long getLastAppliedIndex() {
+        if (lastApplied == -1) {
+            lastApplied = getInitialLastApplied();
+        }
         return lastApplied;
     }
 
     @Override
-    public void setLastApplied(long lastApplied) {
-        this.lastApplied = lastApplied;
+    public void apply(LogEntry entry) {
+        doApply(entry);
+        updateState(entry);
+    }
+
+    @Override
+    public void applyAll(List<LogEntry> entries) {
+        if (!entries.isEmpty()) {
+            entries.forEach(this::doApply);
+            updateState(Utils.getLast(entries));
+        }
+    }
+
+    private void doApply(LogEntry entry) {
+        applyInternal(entry);
+        bytesSinceSnapshot += entry.getData().length;
+    }
+
+    private void updateState(LogEntry latestEntry) {
+        lastApplied = latestEntry.getIndex();
+
+        long logsSinceSnapshot = lastApplied - (lastSnapshot == null ? 0 : lastSnapshot.getLastLogIndex());
+
+        if (snapshotStrategy.shouldSnapshot(logsSinceSnapshot, bytesSinceSnapshot)) {
+            lastSnapshot = takeSnapshot();
+            bytesSinceSnapshot = 0;
+        }
+    }
+
+    protected abstract Snapshot takeSnapshot();
+
+    protected abstract void applyInternal(LogEntry entry);
+
+    @Override
+    public Snapshot getLatestSnapshot() {
+        return lastSnapshot;
     }
 }
