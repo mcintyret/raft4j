@@ -1,9 +1,10 @@
 package com.mcintyret.raft.persist;
 
-import com.mcintyret.raft.address.Peer;
-import com.mcintyret.raft.core.LogEntry;
-
 import java.util.List;
+
+import com.mcintyret.raft.address.Peer;
+import com.mcintyret.raft.core.IndexedAndTermed;
+import com.mcintyret.raft.core.LogEntry;
 
 /**
  * User: tommcintyre
@@ -21,8 +22,6 @@ public interface PersistentState {
     Peer getVotedFor();
 
     void setVotedFor(Peer votedFor);
-
-    List<LogEntry> getAllLogEntries();
 
     List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex);
 
@@ -48,5 +47,12 @@ public interface PersistentState {
      * This is for Followers appending entries sent from the Leader
      */
     void deleteConflictingAndAppend(List<LogEntry> entries);
+
+
+    default void deleteLogsUpToAndIncluding(IndexedAndTermed indexedAndTermed) {
+        deleteLogsUpToAndIncluding(indexedAndTermed.getIndex(), indexedAndTermed.getTerm());
+    }
+
+    void deleteLogsUpToAndIncluding(long index, long term);
 
 }

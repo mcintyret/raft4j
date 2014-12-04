@@ -2,11 +2,9 @@ package com.mcintyret.raft.state;
 
 import java.nio.ByteBuffer;
 
-public interface Snapshot {
+import com.mcintyret.raft.core.IndexedAndTermed;
 
-    long getLastLogIndex();
-
-    long getLastLogTerm();
+public interface Snapshot extends IndexedAndTermed {
 
     ByteBuffer getData();
 

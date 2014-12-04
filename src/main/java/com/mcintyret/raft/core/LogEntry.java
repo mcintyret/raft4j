@@ -4,7 +4,7 @@ package com.mcintyret.raft.core;
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class LogEntry {
+public class LogEntry implements IndexedAndTermed {
 
     private final long term;
 
@@ -18,10 +18,12 @@ public class LogEntry {
         this.data = data;
     }
 
+    @Override
     public long getTerm() {
         return term;
     }
 
+    @Override
     public long getIndex() {
         return index;
     }

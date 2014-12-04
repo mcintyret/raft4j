@@ -29,6 +29,7 @@ import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
+import com.mcintyret.raft.state.Snapshot;
 import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
 
@@ -72,6 +73,8 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
     private long nextHeartbeat;
 
     private ServerRole currentRole;
+
+    private Snapshot currentSnapshot;
 
     // candidate only
     private final Set<Peer> votes = new HashSet<>();
@@ -149,6 +152,11 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
         if (commitIndex > lastAppliedIndex) {
             List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastAppliedIndex + 1, commitIndex + 1);
             stateMachine.applyAll(toApply);
+
+            if (currentSnapshot != stateMachine.getLatestSnapshot()) {
+                currentSnapshot = stateMachine.getLatestSnapshot();
+                persistentState.deleteLogsUpToAndIncluding(currentSnapshot);
+            }
         }
     }
 
@@ -343,10 +351,6 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
         messageDispatcher.sendResponse(response);
     }
 
-    public Peer getMe() {
-        return me;
-    }
-
     private void sendAppendEntriesRequests(boolean heartbeat) {
         if (currentRole != ServerRole.LEADER) {
             throw new IllegalStateException("Only the leader should send AppendEntriesRequests");
@@ -356,8 +360,12 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
 
         peers.forEach(recipient -> {
             int peerIndex = getIndexForPeer(recipient);
+            final long peerNextIndex = nextIndices[peerIndex];
+            final long peerPreviousIndex = peerNextIndex - 1;
 
-            LogEntry previousForPeer = persistentState.getLogEntry(nextIndices[peerIndex] - 1);
+            IndexedAndTermed previousForPeer = (currentSnapshot != null && currentSnapshot.getIndex() == peerPreviousIndex) ?
+                currentSnapshot :
+                persistentState.getLogEntry(peerPreviousIndex);
 
             List<LogEntry> logsToSend;
             if (heartbeat) {
@@ -366,12 +374,11 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage> {
                 // Everything from the last-seen to now. If this turns out to be empty this is essentially a heartbeat.
 
                 // Go to this extra trouble so that we only hit PersistentState (ie Disk) when we need to
-                long fromIndex = nextIndices[peerIndex];
                 long toIndex = lastLogEntry.getIndex() + 1;
-                if (fromIndex == toIndex) {
+                if (peerNextIndex == toIndex) {
                     logsToSend = Collections.emptyList();
                 } else {
-                    logsToSend = persistentState.getLogEntriesBetween(fromIndex, toIndex);
+                    logsToSend = persistentState.getLogEntriesBetween(peerNextIndex, toIndex);
                 }
             }
 
