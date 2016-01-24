@@ -1,12 +1,12 @@
 package com.mcintyret.raft.state;
 
+import com.mcintyret.raft.core.LogEntry;
+
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
-import com.mcintyret.raft.core.LogEntry;
 
 /**
  * User: tommcintyre
@@ -17,7 +17,8 @@ public class FileWritingStateMachine extends BaseStateMachine {
     private final BufferedWriter writer;
 
     public FileWritingStateMachine(String fileName) {
-        super(new LogCountingSnapshotStrategy(5));
+//        super(new LogCountingSnapshotStrategy(5));
+        super(SimpleSnapshotStrategy.NEVER);
         try {
             Path path = Paths.get(fileName);
             if (!Files.exists(path)) {

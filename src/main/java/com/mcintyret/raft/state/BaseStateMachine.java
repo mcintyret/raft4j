@@ -1,9 +1,9 @@
 package com.mcintyret.raft.state;
 
-import java.util.List;
-
 import com.mcintyret.raft.core.LogEntry;
 import com.mcintyret.raft.util.Utils;
+
+import java.util.List;
 
 public abstract class BaseStateMachine implements StateMachine {
 
@@ -54,7 +54,8 @@ public abstract class BaseStateMachine implements StateMachine {
     private void updateState(LogEntry latestEntry) {
         lastApplied = latestEntry.getIndex();
 
-        long logsSinceSnapshot = lastApplied - (lastSnapshot == null ? 0 : lastSnapshot.getLastLogIndex());
+//        long logsSinceSnapshot = lastApplied - (lastSnapshot == null ? 0 : lastSnapshot.getLastLogIndex());
+        long logsSinceSnapshot = 0L;
 
         if (snapshotStrategy.shouldSnapshot(logsSinceSnapshot, bytesSinceSnapshot)) {
             lastSnapshot = takeSnapshot();
