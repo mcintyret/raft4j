@@ -182,7 +182,6 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         long newTerm = persistentState.getCurrentTerm() + 1;
         updateTerm(newTerm, "starting an election");
 
-        // TODO: is this correct? Or should it be last COMMITTED log entry?
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
         sendToAll(recipient -> {
@@ -329,7 +328,6 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         setRole(ServerRole.LEADER, "won the election");
         currentLeader = me;
 
-        // TODO: Again, should this be the last COMMITTED index?
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
         Arrays.fill(nextIndices, lastLogEntry.getIndex() + 1);
 
