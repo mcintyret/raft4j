@@ -1,18 +1,5 @@
 package com.mcintyret.raft.core;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.mcintyret.raft.address.Address;
 import com.mcintyret.raft.address.Addressable;
 import com.mcintyret.raft.address.Peer;
@@ -34,6 +21,18 @@ import com.mcintyret.raft.rpc.RpcMessageVisitor;
 import com.mcintyret.raft.state.Snapshot;
 import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * User: tommcintyre
@@ -385,7 +384,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
             }
 
             if (logsToSend.isEmpty()) {
-                LOG.info("Sending heartbeat to peer id={}", recipient);
+                LOG.debug("Sending heartbeat to peer id={}", recipient);
             } else {
                 LOG.info("Sending AppendEntriesRequest with {} logs to peer id={}", logsToSend.size(), recipient);
             }
