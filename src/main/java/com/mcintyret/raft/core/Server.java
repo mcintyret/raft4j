@@ -3,6 +3,7 @@ package com.mcintyret.raft.core;
 import com.mcintyret.raft.address.Address;
 import com.mcintyret.raft.address.Addressable;
 import com.mcintyret.raft.address.Peer;
+import com.mcintyret.raft.configuration.Configuration;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
 import com.mcintyret.raft.message.MessageReceiver;
@@ -50,9 +51,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
     // Simplifying assumption for now: peers are immutable. A peer may disappear then reappear, but no NEW peers will
     // turn up.
     // TODO: remove this assumption!
-    private final List<Peer> peers;
-
-    private final int majoritySize;
+    private Configuration configuration;
 
     private final PersistentState persistentState;
 
@@ -98,14 +97,13 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
                 " including myself) so that a majority can be reached.");
         }
         this.me = me;
-        this.peers = peers;
+        this.configuration = new Configuration(peers);
         this.persistentState = persistentState;
         this.electionTimeoutGenerator = electionTimeoutGenerator;
         this.stateMachine = stateMachine;
         this.messageDispatcher = messageDispatcher;
 
         resetElectionTimeout();
-        majoritySize = 1 + (peers.size() / 2);
         nextIndices = new long[peers.size()];
     }
 
@@ -267,7 +265,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
                 // This response could meant that a majority of servers have seen that log entry - they have been committed.
                 entries.forEach(entry -> {
                     long index = entry.getIndex();
-                    if (index > commitIndex && indicesAwaitingCommit.add(index) >= majoritySize) {
+                    if (index > commitIndex && indicesAwaitingCommit.add(index) >= configuration.getMajoritySize()) {
                         LOG.info("Log index={} has been persisted by the majority and is COMMITTED", index);
                         commitIndex = index;
                         indicesAwaitingCommit.clear(index); // clean-up - not interested any more
@@ -316,7 +314,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         if (currentRole == ServerRole.CANDIDATE && rvResp.isVoteGranted()) {
             votes.add((Peer) rvResp.getHeader().getSource());
 
-            if (votes.size() >= majoritySize) {
+            if (votes.size() >= configuration.getMajoritySize()) {
 
                 // I've won! (as least as far as I'm concerned...
                 becomeLeader();
@@ -365,7 +363,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
         LogEntry lastLogEntry = persistentState.getLastLogEntry();
 
-        peers.forEach(recipient -> {
+        configuration.getPeers().forEach(recipient -> {
             int peerIndex = getIndexForPeer(recipient);
             final long peerNextIndex = nextIndices[peerIndex];
             final long peerPreviousIndex = peerNextIndex - 1;
@@ -411,11 +409,11 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
     }
 
     private void sendToAll(Function<Peer, BaseRequest> func) {
-        peers.forEach(recipient -> messageDispatcher.sendRequest(func.apply(recipient)));
+        configuration.getPeers().forEach(recipient -> messageDispatcher.sendRequest(func.apply(recipient)));
     }
 
     private int getIndexForPeer(Peer peer) {
-        return peers.indexOf(peer);
+        return configuration.getPeers().indexOf(peer);
     }
 
     private void setRole(ServerRole newRole, String reason) {
