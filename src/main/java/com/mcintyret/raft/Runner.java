@@ -263,15 +263,6 @@ public class Runner {
         }
     }
 
-//    public static void main(String[] args) throws IOException {
-//        while (true) {
-//            String in = readInputStreamWithTimeout(System.in, 1000);
-//            if (in != null) {
-//                System.out.println(in);
-//            }
-//        }
-//    }
-
     private static class RetryingMessageDispatcherImpl extends BaseRetryingMessageDispatcher {
 
         public RetryingMessageDispatcherImpl(Messages messages) {
