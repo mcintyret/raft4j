@@ -336,7 +336,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
         if (currentRole == ServerRole.LEADER) {
             LogEntry lastEntry = persistentState.getLastLogEntry();
-            LogEntry newEntry = new LogEntry(lastEntry.getTerm(), lastEntry.getIndex() + 1, neReq.getData());
+            LogEntry newEntry = new LogEntry(persistentState.getCurrentTerm(), lastEntry.getIndex() + 1, neReq.getData());
 
             persistentState.appendLogEntry(newEntry);
             indicesAwaitingCommit.add(newEntry.getIndex()); // I, the leader, count as one of the replicas
