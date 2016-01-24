@@ -12,7 +12,7 @@ public class RandomElectionTimeoutGenerator implements ElectionTimeoutGenerator 
 
     private final long minimum;
 
-    private final long maximum;
+    private final int diff;
 
     public RandomElectionTimeoutGenerator(long minimum, long maximum) {
         this(new Random(), minimum, maximum);
@@ -28,12 +28,16 @@ public class RandomElectionTimeoutGenerator implements ElectionTimeoutGenerator 
         }
         this.random = random;
         this.minimum = minimum;
-        this.maximum = maximum;
+        this.diff = (int) (maximum - minimum);
     }
 
     @Override
     public synchronized long nextElectionTimeout() {
-        int diff = (int) (maximum - minimum);
         return System.currentTimeMillis() + minimum + random.nextInt(diff);
+    }
+
+    @Override
+    public long minimumElectionTimeout() {
+        return minimum;
     }
 }

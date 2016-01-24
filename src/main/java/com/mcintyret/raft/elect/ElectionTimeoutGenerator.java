@@ -8,4 +8,6 @@ public interface ElectionTimeoutGenerator {
 
     long nextElectionTimeout();
 
+    long minimumElectionTimeout();
+
 }
