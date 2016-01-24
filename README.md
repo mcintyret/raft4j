@@ -7,11 +7,12 @@ Also, it currently works will all peers in the same JVM communicating via a simp
  relatively straightforward to update the current implementation to work across the network.
 
 To give it a go:
+
 1. clone the repo and set up a project
 2. run com.mcintyret.raft.Runner
 3. this will create a folder called logs/, with a number of log files - one for each peer showing the committed state machine
 of that peer, and one showing the log output of the consensus algorithm as it works. Tail -f those logs in separate windows
-if you wish
+if you wish - this will let you see the peers commit their log entries in real time.
 4. interact with the peers by sending them messages. The possible messages are:
 
 send: <id>: <message>
