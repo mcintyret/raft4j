@@ -71,6 +71,8 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
     private long nextElectionTimeout;
 
+    private long minElectionTimeout;
+
     private long nextHeartbeat;
 
     private ServerRole currentRole;
@@ -240,6 +242,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
     private void resetElectionTimeout() {
         nextElectionTimeout = electionTimeoutGenerator.nextElectionTimeout();
+        minElectionTimeout = System.currentTimeMillis() + electionTimeoutGenerator.minimumElectionTimeout();
     }
 
     @Override
@@ -287,7 +290,7 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         long currentTerm = persistentState.getCurrentTerm();
         boolean voteGranted = false;
 
-        if (rvReq.getTerm() >= currentTerm) {
+        if (System.currentTimeMillis() > minElectionTimeout && rvReq.getTerm() >= currentTerm) {
             Peer votedFor = persistentState.getVotedFor();
             // if we haven't voted for someone else already this term...
             Peer candidate = (Peer) rvReq.getHeader().getSource();
