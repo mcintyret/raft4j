@@ -15,17 +15,17 @@ of that peer, and one showing the log output of the consensus algorithm as it wo
 if you wish - this will let you see the peers commit their log entries in real time.
 4. interact with the peers by sending them messages. The possible messages are:
 
-send: <id>: <message>
-- send a message with text <message> to peer with id <id>
+send: \<id\>: \<message\>
+- send a message with text \<message\> to peer with id \<id\>
 
-start: <id>
-- start peer with id <id> (note all peers are initially started by default; this will error unless stop is called first)
+start: \<id\>
+- start peer with id \<id\> (note all peers are initially started by default; this will error unless stop is called first)
 
-stop
-- stop peer with id <id>
+stop: \<id\>
+- stop peer with id \<id\>
 
-mute: <id>
-- prevent peer with id <id> from receiving any messages
+mute: \<id\>
+- prevent peer with id \<id\> from receiving any messages
 
-unmute: <id>
-- allow muted peer with id <id> to receive messages again
+unmute: \<id\>
+- allow muted peer with id \<id\> to receive messages again
