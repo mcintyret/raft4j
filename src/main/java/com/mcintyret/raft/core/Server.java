@@ -273,7 +273,12 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
                 });
             }
         } else {
-            nextIndices[peerIndex]--; // TODO: smarter algorithm here?
+            /*
+             The logs we sent would have left a 'hole' in the receiver
+             - decrease the index they require by one and try again.
+             TODO: smarter algorithm, eg binary search
+              */
+            nextIndices[peerIndex]--;
         }
     }
 
