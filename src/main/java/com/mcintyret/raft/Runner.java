@@ -1,30 +1,5 @@
 package com.mcintyret.raft;
 
-import com.mcintyret.raft.address.Address;
-import com.mcintyret.raft.address.Client;
-import com.mcintyret.raft.address.Peer;
-import com.mcintyret.raft.core.Server;
-import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
-import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
-import com.mcintyret.raft.message.BaseRetryingMessageDispatcher;
-import com.mcintyret.raft.message.DecoratingMessageReceiver;
-import com.mcintyret.raft.message.MessageDispatcher;
-import com.mcintyret.raft.message.MessageReceiver;
-import com.mcintyret.raft.message.Messages;
-import com.mcintyret.raft.persist.InMemoryPersistentState;
-import com.mcintyret.raft.persist.PersistentState;
-import com.mcintyret.raft.rpc.BaseRequest;
-import com.mcintyret.raft.rpc.BaseResponse;
-import com.mcintyret.raft.rpc.Header;
-import com.mcintyret.raft.rpc.Message;
-import com.mcintyret.raft.rpc.NewEntryRequest;
-import com.mcintyret.raft.rpc.NewEntryResponse;
-import com.mcintyret.raft.rpc.RpcMessage;
-import com.mcintyret.raft.state.FileWritingStateMachine;
-import com.mcintyret.raft.state.StateMachine;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -37,6 +12,32 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.mcintyret.raft.address.Address;
+import com.mcintyret.raft.address.Addressable;
+import com.mcintyret.raft.address.Client;
+import com.mcintyret.raft.address.Peer;
+import com.mcintyret.raft.core.Server;
+import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
+import com.mcintyret.raft.elect.RandomElectionTimeoutGenerator;
+import com.mcintyret.raft.message.BaseMessageDispatcher;
+import com.mcintyret.raft.message.DecoratingMessageReceiver;
+import com.mcintyret.raft.message.MessageDispatcher;
+import com.mcintyret.raft.message.MessageReceiver;
+import com.mcintyret.raft.message.Messages;
+import com.mcintyret.raft.persist.InMemoryPersistentState;
+import com.mcintyret.raft.persist.PersistentState;
+import com.mcintyret.raft.rpc.BaseRequest;
+import com.mcintyret.raft.rpc.BaseResponse;
+import com.mcintyret.raft.rpc.Message;
+import com.mcintyret.raft.rpc.NewEntryRequest;
+import com.mcintyret.raft.rpc.NewEntryResponse;
+import com.mcintyret.raft.rpc.RpcMessage;
+import com.mcintyret.raft.state.FileWritingStateMachine;
+import com.mcintyret.raft.state.StateMachine;
 
 /**
  * User: tommcintyre
@@ -69,7 +70,7 @@ public class Runner {
 
     }
 
-    private static class ConsoleClient implements Client, MessageReceiver<Message> {
+    private static class ConsoleClient implements Client, MessageReceiver<Message>, Addressable {
 
         private static final Logger LOG = LoggerFactory.getLogger("Client");
 
@@ -81,7 +82,7 @@ public class Runner {
 
         private ConsoleClient() {
             Messages messages = new Messages();
-            this.messageDispatcher = new RetryingMessageDispatcherImpl(messages);
+            this.messageDispatcher = new MessageDispatcherImpl(messages);
             this.messageReceiver = new DecoratingMessageReceiver<>(messages, this);
         }
 
@@ -147,7 +148,7 @@ public class Runner {
         }
 
         private void sendBytes(Peer peer, byte[] bytes) {
-            messageDispatcher.sendRequest(new NewEntryRequest(new Header(this, peer), bytes));
+            messageDispatcher.sendRequest(new NewEntryRequest(headerFor(peer), bytes));
         }
 
         @Override
@@ -158,6 +159,11 @@ public class Runner {
         @Override
         public String toString() {
             return "ConsoleClient";
+        }
+
+        @Override
+        public Address getAddress() {
+            return this;
         }
     }
 
@@ -227,7 +233,7 @@ public class Runner {
 
             Messages messages = new Messages();
 
-            server = new Server(peer, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, new RetryingMessageDispatcherImpl(messages), stateMachine);
+            server = new Server(peer, peers, persistentState, ELECTION_TIMEOUT_GENERATOR, new MessageDispatcherImpl(messages), stateMachine);
             messageReceiver = new DecoratingMessageReceiver<>(messages, server);
             thread = new Thread(server::run, "Server: " + peer);
 
@@ -263,9 +269,9 @@ public class Runner {
         }
     }
 
-    private static class RetryingMessageDispatcherImpl extends BaseRetryingMessageDispatcher {
+    private static class MessageDispatcherImpl extends BaseMessageDispatcher {
 
-        public RetryingMessageDispatcherImpl(Messages messages) {
+        public MessageDispatcherImpl(Messages messages) {
             super(messages);
         }
 
@@ -311,9 +317,7 @@ public class Runner {
 
             IntegerPeer that = (IntegerPeer) o;
 
-            if (id != that.id) return false;
-
-            return true;
+            return id == that.id;
         }
 
         @Override

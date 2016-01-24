@@ -1,11 +1,13 @@
 package com.mcintyret.raft.persist;
 
-import com.mcintyret.raft.address.Peer;
-import com.mcintyret.raft.core.LogEntry;
-
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+
+import com.mcintyret.raft.address.Peer;
+import com.mcintyret.raft.core.LogEntry;
+import com.mcintyret.raft.util.Utils;
 
 /**
  * User: tommcintyre
@@ -19,6 +21,8 @@ public class InMemoryPersistentState implements PersistentState {
     private final List<LogEntry> logEntries = new ArrayList<>();
 
     private Peer votedFor = null;
+
+    private long offset = 1;
 
     @Override
     public long getCurrentTerm() {
@@ -48,30 +52,29 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
-    public List<LogEntry> getAllLogEntries() {
-        return Collections.unmodifiableList(logEntries);
-    }
-
-    @Override
     public List<LogEntry> getLogEntriesBetween(long fromIndex, long toIndex) {
-        return Collections.unmodifiableList(new ArrayList<>(logEntries.subList((int) --fromIndex, (int) --toIndex)));
+        return Collections.unmodifiableList(new ArrayList<>(logEntries.subList(index(fromIndex), index(toIndex))));
     }
 
     @Override
     public LogEntry getLogEntry(long logIndex) {
-        return logIndex == 0 ? EMPTY_LOG : logEntries.get((int) (logIndex - 1));
+        LogEntry entry =  logIndex == 0 ? EMPTY_LOG : logEntries.get(index(logIndex));
+        if (entry.getIndex() != logIndex) {
+            throw new IllegalStateException("Index mismatch: asked for " + logIndex + " but got " + entry.getIndex());
+        }
+        return entry;
     }
 
     @Override
     public LogEntry getLastLogEntry() {
-        return logEntries.isEmpty() ? EMPTY_LOG : logEntries.get(logEntries.size() - 1);
+        return logEntries.isEmpty() ? EMPTY_LOG : Utils.getLast(logEntries);
     }
 
     @Override
     public void deleteConflictingAndAppend(List<LogEntry> entries) {
         int listIndex = -1;
         for (LogEntry entry : entries) {
-            listIndex = (int) (entry.getIndex() - 1);
+            listIndex = index(entry.getIndex());
             if (logEntries.size() <= listIndex) {
                 logEntries.add(entry);
             } else {
@@ -87,8 +90,24 @@ public class InMemoryPersistentState implements PersistentState {
     }
 
     @Override
+    public void deleteLogsUpToAndIncluding(long index, long term) {
+        Iterator<LogEntry> it = logEntries.iterator();
+        while (it.hasNext()) {
+            LogEntry entry = it.next();
+            if (entry.getIndex() <= index) {
+                it.remove();
+            }
+        }
+        offset = index + 1;
+    }
+
+    @Override
     public void appendLogEntry(LogEntry newEntry) {
         logEntries.add(newEntry);
+    }
+
+    private int index(long index) {
+        return (int) (index - offset);
     }
 
 }

@@ -1,5 +1,20 @@
 package com.mcintyret.raft.core;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.mcintyret.raft.address.Address;
+import com.mcintyret.raft.address.Addressable;
 import com.mcintyret.raft.address.Peer;
 import com.mcintyret.raft.elect.ElectionTimeoutGenerator;
 import com.mcintyret.raft.message.MessageDispatcher;
@@ -16,26 +31,15 @@ import com.mcintyret.raft.rpc.RequestVoteRequest;
 import com.mcintyret.raft.rpc.RequestVoteResponse;
 import com.mcintyret.raft.rpc.RpcMessage;
 import com.mcintyret.raft.rpc.RpcMessageVisitor;
+import com.mcintyret.raft.state.Snapshot;
 import com.mcintyret.raft.state.StateMachine;
 import com.mcintyret.raft.util.Multiset;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * User: tommcintyre
  * Date: 11/29/14
  */
-public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, AutoCloseable {
+public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, Addressable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Server.class);
 
@@ -71,6 +75,8 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
     private long nextHeartbeat;
 
     private ServerRole currentRole;
+
+    private Snapshot currentSnapshot;
 
     // candidate only
     private final Set<Peer> votes = new HashSet<>();
@@ -144,12 +150,15 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
     }
 
     private void updateStateMachine() {
-        long lastApplied = stateMachine.getLastApplied();
-        if (commitIndex > lastApplied) {
-            List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastApplied + 1, commitIndex + 1);
-            toApply.forEach(entry -> stateMachine.apply(entry.getIndex(), entry.getData()));
+        long lastAppliedIndex = stateMachine.getLastAppliedIndex();
+        if (commitIndex > lastAppliedIndex) {
+            List<LogEntry> toApply = persistentState.getLogEntriesBetween(lastAppliedIndex + 1, commitIndex + 1);
+            stateMachine.applyAll(toApply);
 
-            stateMachine.setLastApplied(commitIndex);
+            if (currentSnapshot != stateMachine.getLatestSnapshot()) {
+                currentSnapshot = stateMachine.getLatestSnapshot();
+                persistentState.deleteLogsUpToAndIncluding(currentSnapshot);
+            }
         }
     }
 
@@ -344,10 +353,6 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         messageDispatcher.sendResponse(response);
     }
 
-    public Peer getMe() {
-        return me;
-    }
-
     private void sendAppendEntriesRequests(boolean heartbeat) {
         if (currentRole != ServerRole.LEADER) {
             throw new IllegalStateException("Only the leader should send AppendEntriesRequests");
@@ -357,8 +362,12 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
 
         peers.forEach(recipient -> {
             int peerIndex = getIndexForPeer(recipient);
+            final long peerNextIndex = nextIndices[peerIndex];
+            final long peerPreviousIndex = peerNextIndex - 1;
 
-            LogEntry previousForPeer = persistentState.getLogEntry(nextIndices[peerIndex] - 1);
+            IndexedAndTermed previousForPeer = (currentSnapshot != null && currentSnapshot.getIndex() == peerPreviousIndex) ?
+                currentSnapshot :
+                persistentState.getLogEntry(peerPreviousIndex);
 
             List<LogEntry> logsToSend;
             if (heartbeat) {
@@ -367,12 +376,11 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
                 // Everything from the last-seen to now. If this turns out to be empty this is essentially a heartbeat.
 
                 // Go to this extra trouble so that we only hit PersistentState (ie Disk) when we need to
-                long fromIndex = nextIndices[peerIndex];
                 long toIndex = lastLogEntry.getIndex() + 1;
-                if (fromIndex == toIndex) {
+                if (peerNextIndex == toIndex) {
                     logsToSend = Collections.emptyList();
                 } else {
-                    logsToSend = persistentState.getLogEntriesBetween(fromIndex, toIndex);
+                    logsToSend = persistentState.getLogEntriesBetween(peerNextIndex, toIndex);
                 }
             }
 
@@ -412,16 +420,8 @@ public class Server implements RpcMessageVisitor, MessageReceiver<RpcMessage>, A
         }
     }
 
-    private Header headerFor(Peer recipient) {
-        return new Header(me, recipient);
-    }
-
-    private Header headerFor(BaseRequest request) {
-        return new Header(me, request.getHeader().getSource(), request.getHeader().getRuuid());
-    }
-
     @Override
-    public void close() throws Exception {
-        messageDispatcher.close();
+    public Address getAddress() {
+        return me;
     }
 }
